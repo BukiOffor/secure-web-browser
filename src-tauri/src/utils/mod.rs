@@ -1,9 +1,12 @@
 use std::process::Command;
 
+use mac_address::get_mac_address;
 use serde::Serialize;
+use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutEvent, ShortcutState};
-use mac_address::get_mac_address;
+
+use crate::AppState;
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct HostInfo {
@@ -11,21 +14,20 @@ pub struct HostInfo {
     pub arch: String,
     pub mac_address: Option<String>,
     pub serial_number: Option<String>,
-    pub processor_id : Option<String>
+    pub processor_id: Option<String>,
 }
-
 
 pub fn build_bindings(
     app: &AppHandle,
     shortcut: &Shortcut,
     event: &ShortcutEvent,
-    ctrl_k_shortcut: &Shortcut,
+    kill_binding: &Shortcut,
     cltr_alt_delete_shortcut: &Shortcut,
     minimized_shortcut: &Shortcut,
 ) {
     // Handle the global shortcuts
     println!("{:?}", shortcut);
-    if shortcut == ctrl_k_shortcut {
+    if shortcut == kill_binding {
         match event.state() {
             ShortcutState::Pressed => {
                 println!("Ctrl-K Pressed!");
@@ -34,6 +36,17 @@ pub fn build_bindings(
                 println!("Ctrl-K Released!");
                 app.emit("show-password-prompt", ())
                     .expect("Failed to emit show-password-prompt");
+                
+                #[cfg(target_os = "windows")]
+                {
+                    let child_process = app.app_handle().state::<AppState>().child_process.clone();
+                    let mut lock = child_process.lock().unwrap();
+                    if let Some(child) = lock.take() {
+                        let _ = child.kill();
+                        println!("🛑 Sidecar killed on exit.");
+                    }
+                }
+
                 app.exit(0);
             }
         }
@@ -74,19 +87,18 @@ pub fn is_virtual_machine() -> bool {
 
     // false
     use inside_vm::inside_vm;
-    inside_vm() 
+    inside_vm()
 }
 
 #[cfg(not(target_os = "windows"))]
 pub fn is_virtual_machine() -> bool {
-    false   
+    false
 }
-
 
 #[cfg(target_os = "windows")]
 pub fn is_running_in_rdp() -> bool {
     use windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics;
-    use windows::Win32::UI::WindowsAndMessaging::{SM_REMOTESESSION};
+    use windows::Win32::UI::WindowsAndMessaging::SM_REMOTESESSION;
 
     unsafe { GetSystemMetrics(SM_REMOTESESSION) != 0 }
 }

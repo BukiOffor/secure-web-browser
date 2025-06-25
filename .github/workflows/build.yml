@@ -62,3 +62,4 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+                -- kiosk # This is optional, remove it if you don't want to build a kiosk app.
