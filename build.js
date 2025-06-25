@@ -5,7 +5,7 @@ const { execa } = require("execa");
 const fs = require("fs");
 
 const config = {
-	source: "mapper/target/release/mapper" || "mapper/target/release/mapper.exe",
+	source: "mapper/target/release/mapper",
 	destFolder: "src-tauri/bin/mapper",
 };
 
@@ -59,8 +59,9 @@ function copy() {
 
 		//Copy the binary
 		if (process.platform == "win32") {
+			let source = `${config.source}.exe`;
 			let dest = `${config.destFolder}.exe`;
-			fs.copyFileSync(config.source, dest);
+			fs.copyFileSync(source, dest);
 		} else {
 			fs.copyFileSync(config.source, config.destFolder);
 		}

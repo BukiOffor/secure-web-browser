@@ -1,4 +1,5 @@
 #[cfg(target_os = "windows")]
+//#[allow(unsafe_op_in_unsafe_fn)]
 pub mod key_mapper {
     use std::ptr::null_mut;
     use windows::{
@@ -85,7 +86,7 @@ pub mod key_mapper {
     // }
     // }
 
-    
+
 }
 #[cfg(not(target_os = "windows"))]
 pub mod key_mapper{
