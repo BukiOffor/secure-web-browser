@@ -22,10 +22,10 @@ pub fn run() {
             println!("Running app in kiosk mode set to : {}", is_kiosk);
 
             let window = app.get_webview_window("main").unwrap();
-            window.set_fullscreen(is_kiosk.clone())?;
-            window.set_decorations(!is_kiosk.clone())?;
-            window.set_always_on_top(is_kiosk.clone())?;
-            window.set_resizable(!is_kiosk.clone())?;
+            window.set_fullscreen(true)?;
+            window.set_decorations(false)?;
+            window.set_always_on_top(true)?;
+            window.set_resizable(false)?;
             //window.hide_menu()?;
             //window.remove_menu()?;
             let manager = app.handle();
