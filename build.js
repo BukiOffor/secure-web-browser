@@ -52,28 +52,36 @@ async function rename() {
 
 function copy() {
 	try {
+
+		let source = config.source;
+		let dest = config.destFolder;
+		if (process.platform == "win32") {
+			source = `${config.source}.exe`;
+			dest = `${config.destFolder}.exe`;
+		}
+
 		// Check if source binary exists
-		if (!fs.existsSync(config.source)) {
+		if (!fs.existsSync(source)) {
 			throw new Error(`Source binary not found: ${config.source}`);
 		}
 
 		//Copy the binary
-		if (process.platform == "win32") {
-			let source = `${config.source}.exe`;
-			let dest = `${config.destFolder}.exe`;
+		// if (process.platform == "win32") {
+		// 	let source = `${config.source}.exe`;
+		// 	let dest = `${config.destFolder}.exe`;
+		// 	fs.copyFileSync(source, dest);
+		// } else {
 			fs.copyFileSync(source, dest);
-		} else {
-			fs.copyFileSync(config.source, config.destFolder);
-		}
+		//}
 
 		// Make it executable on Unix-like systems
 		if (process.platform !== "win32") {
-			fs.chmodSync(config.destFolder, "755");
+			fs.chmodSync(dest, "755");
 		}
 
 		console.log(`✅ Binary copied and renamed successfully!`);
-		console.log(`   From: ${config.source}`);
-		console.log(`   To:   ${config.destFolder}`);
+		console.log(`   From: ${source}`);
+		console.log(`   To:   ${dest}`);
 	} catch (error) {
 		console.error("❌ Error copying binary:", error.message);
 		process.exit(1);
