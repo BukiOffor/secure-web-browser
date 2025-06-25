@@ -52,27 +52,16 @@ async function rename() {
 
 function copy() {
 	try {
-
-		let source = config.source;
-		let dest = config.destFolder;
-		if (process.platform == "win32") {
-			source = `${config.source}.exe`;
-			dest = `${config.destFolder}.exe`;
-		}
+		// Add .exe extension on Windows
+		const extension = process.platform === "win32" ? ".exe" : "";
+		let source = config.source + extension;
+		let dest = config.destFolder + extension;
 
 		// Check if source binary exists
 		if (!fs.existsSync(source)) {
 			throw new Error(`Source binary not found: ${config.source}`);
 		}
-
-		//Copy the binary
-		// if (process.platform == "win32") {
-		// 	let source = `${config.source}.exe`;
-		// 	let dest = `${config.destFolder}.exe`;
-		// 	fs.copyFileSync(source, dest);
-		// } else {
-			fs.copyFileSync(source, dest);
-		//}
+		fs.copyFileSync(source, dest);
 
 		// Make it executable on Unix-like systems
 		if (process.platform !== "win32") {
