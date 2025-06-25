@@ -28,7 +28,7 @@ mac_address = "1.1.8"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 inside-vm = "0.2.0"
-windows = {version="0.60.0", features = ["Win32_System_RemoteDesktop", "Win32_Foundation", "Win32", "Win32_UI", "Win32_UI_WindowsAndMessaging"]}
+windows = {version="0.60.0", features = ["Win32_System_RemoteDesktop", "Win32_Foundation", "Win32", "Win32_UI", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
