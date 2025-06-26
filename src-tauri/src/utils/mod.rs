@@ -1,3 +1,4 @@
+pub mod installer;
 use std::process::Command;
 
 use mac_address::get_mac_address;
@@ -36,7 +37,7 @@ pub fn build_bindings(
                 println!("Ctrl-K Released!");
                 app.emit("show-password-prompt", ())
                     .expect("Failed to emit show-password-prompt");
-                
+
                 #[cfg(target_os = "windows")]
                 {
                     let child_process = app.app_handle().state::<AppState>().child_process.clone();

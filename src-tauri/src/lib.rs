@@ -21,6 +21,42 @@ pub fn run() {
     let child_process: Arc<Mutex<Option<CommandChild>>> = Arc::new(Mutex::default());
     let app_state = AppState { child_process };
 
+    #[cfg(target_os = "windows")]
+    {
+        // Check if WebView2 is installed. If not, run the embedded installer.
+        if !utils::installer::webview_installer::is_webview2_installed() {
+            println!("WebView2 is not installed, running installer...");
+            // Embed the installer bytes directly into the executable at compile time.
+            let installer_bytes = include_bytes!("installer/MicrosoftEdgeWebview2Setup.exe");
+
+            // Get the system's temporary directory.
+            let temp_dir = std::env::temp_dir();
+            let installer_path = temp_dir.join("MicrosoftEdgeWebview2Setup.exe");
+
+            // Write the installer bytes to a file in the temp directory.
+            if std::fs::write(&installer_path, installer_bytes).is_ok() {
+                // Execute the installer silently and wait for it to complete.
+                // The user will see a UAC prompt to allow the installation.
+                let status = process::Command::new(installer_path)
+                    .arg("/silent")
+                    .arg("/install")
+                    .status(); // .status() waits for the command to exit
+                match status {
+                    Ok(s) => match s.success() == true {
+                        true => println!("WebView2 installed successfully!"),
+                        false => print!("Installation was not succesfull {}", s),
+                    },
+                    Err(e) => {
+                        eprintln!("Error executing installer: {}", e);
+                        //process::exit(1);
+                    }
+                }
+            }
+        } else {
+            println!("WebView2 is already installed, continuing...");
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
