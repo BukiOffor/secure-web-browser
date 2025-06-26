@@ -18,10 +18,13 @@ pub fn run() {
     println!("arguments: {:?}", args);
     let is_kiosk = args.iter().any(|arg| arg == "kiosk");
     println!("Running app in kiosk mode set to : {}", is_kiosk);
+    let child_process: Arc<Mutex<Option<CommandChild>>> = Arc::new(Mutex::default());
+    let app_state = AppState { child_process };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(app_state)
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -72,7 +75,7 @@ pub fn run() {
                                     }
                                     CommandEvent::Terminated(_) => {
                                         eprintln!("[Sidecar] Terminated.");
-                                        process::exit(1); // Exit on error
+                                        //process::exit(1); // Exit on error
                                     }
                                     _ => {}
                                 }
