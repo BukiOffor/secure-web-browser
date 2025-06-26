@@ -34,7 +34,12 @@
       "icons/icon.ico"
     ],
     "createUpdaterArtifacts": true,
-    "externalBin": ["bin/mapper"] 
+    "externalBin": ["bin/mapper"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller"
+      }
+    } 
   },
   "plugins": {
     "updater": {
