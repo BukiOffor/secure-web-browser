@@ -13,9 +13,10 @@ pub mod key_mapper {
         unsafe { (GetAsyncKeyState(vk.0 as i32) as u32 & 0x8000 as u32) != 0 }
     }
 
+    #[allow(unsafe_op_in_unsafe_fn)]
     unsafe extern "system" fn keyboard_proc(code: i32, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
         if code >= 0 && (w_param.0 == WM_KEYDOWN as usize || w_param.0 == WM_SYSKEYDOWN as usize) {
-            let kb: &KBDLLHOOKSTRUCT = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+            let kb: &KBDLLHOOKSTRUCT = unsafe{ &*(l_param.0 as *const KBDLLHOOKSTRUCT) };
             let vk = kb.vkCode;
 
             let alt_down = is_key_pressed(VK_MENU);
