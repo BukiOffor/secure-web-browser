@@ -21,50 +21,26 @@ pub fn build_bindings(
     minimized_shortcut: &Shortcut,
 ) {
     // Handle the global shortcuts
-   log::info!("{:?}", shortcut);
+    log::info!("{:?}", shortcut);
     if shortcut == kill_binding {
         match event.state() {
             ShortcutState::Pressed => {
-               log::info!("Ctrl-K Pressed!");
+                log::info!("Ctrl-K Pressed!");
             }
             ShortcutState::Released => {
-               log::info!("Ctrl-K Released!");
+                log::info!("Ctrl-K Released!");
                 app.emit("show-password-prompt", ())
-                    .expect("Failed to emit show-password-prompt");
-
-                #[cfg(target_os = "windows")]
-                {
-                    let child_process = app.app_handle().state::<AppState>().child_process.clone();
-                    let mut lock = child_process.lock().unwrap();
-                    if let Some(child) = lock.take() {
-                        let _ = child.kill();
-                       log::info!("🛑 Sidecar killed on exit.");
-                    }
-                }
-                let process = &app.app_handle().state::<SchedulerState>().0;
-                let mut lock = process.lock().unwrap();
-                if let Some(child) = lock.take() {
-                    let _ = child.stop();
-                   log::info!("🛑 Input Scheduler killed on exit");
-                }
-                {
-                    let process = &app.app_handle().state::<RemoteChecker>().0;
-                    let mut lock = process.lock().unwrap();
-                    if let Some(child) = lock.take() {
-                        let _ = child.stop();
-                       log::info!("🛑 Remote Scheduler killed on exit");
-                    }
-                }
+                    .expect("Failed to emit show-password-prompt"); 
                 app.exit(0);
             }
         }
     } else if shortcut == cltr_alt_delete_shortcut {
         match event.state() {
             ShortcutState::Pressed => {
-               log::info!("Ctrl+Alt+Delete Pressed!");
+                log::info!("Ctrl+Alt+Delete Pressed!");
             }
             ShortcutState::Released => {
-               log::info!("Ctrl+Alt+Delete Released!");
+                log::info!("Ctrl+Alt+Delete Released!");
                 app.emit("show-ctrl-alt-delete-prompt", ())
                     .expect("Failed to emit show-ctrl-alt-delete-prompt");
             }
@@ -72,10 +48,10 @@ pub fn build_bindings(
     } else if shortcut == minimized_shortcut {
         match event.state() {
             ShortcutState::Pressed => {
-               log::info!("Super+D Pressed!");
+                log::info!("Super+D Pressed!");
             }
             ShortcutState::Released => {
-               log::info!("Super+D Released!");
+                log::info!("Super+D Released!");
             }
         }
     }
@@ -220,7 +196,7 @@ fn is_udp_running() -> Vec<PortStatus> {
             Ok(_) => continue, // If bind succeeds, port is free
             // If bind fails, port is likely in use
             Err(_) => {
-               log::info!(
+                log::info!(
                     "Port {} refused connection, assuming Udp is running...",
                     port
                 );
@@ -261,14 +237,9 @@ pub fn is_web_rtc_running() -> WebRtcReport {
     }
 }
 
+pub fn assign_seat_number_to_computer() {}
 
-pub fn assign_seat_number_to_computer(){
-
-}
-
-pub fn change_seat_number(){
-
-}
+pub fn change_seat_number() {}
 
 pub fn validate_otp() -> bool {
     true
