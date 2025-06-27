@@ -1,30 +1,16 @@
 use std::process::Command;
-
+pub mod types;
+use crate::utils::types::{HostInfo, PortStatus, ProcessIdentifier, USBDevice, WebRtcReport};
+use crate::{AppState, RemoteChecker, SchedulerState};
 use mac_address::get_mac_address;
 use serde::Serialize;
+use std::net::UdpSocket;
+use sysinfo::System;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutEvent, ShortcutState};
 
-use crate::{AppState, SchedulerState};
-
-const INPUT_KEYWORDS: [&str; 4] = ["usb camera", "usb video", "mass storage", "hard disk"];
-
-#[derive(Debug, Clone, Serialize)]
-pub enum Triggers {
-    DisAllowedInputDectected,
-    UDPDectected,
-    RemoteApplicationDectected,
-}
-
-#[derive(Debug, Clone, Serialize, Default)]
-pub struct HostInfo {
-    pub os: String,
-    pub arch: String,
-    pub mac_address: Option<String>,
-    pub serial_number: Option<String>,
-    pub processor_id: Option<String>,
-}
+const INPUT_KEYWORDS: [&str; 2] = ["mass storage", "hard disk"];
 
 pub fn build_bindings(
     app: &AppHandle,
@@ -60,6 +46,14 @@ pub fn build_bindings(
                 if let Some(child) = lock.take() {
                     let _ = child.stop();
                     println!("🛑 Input Scheduler killed on exit");
+                }
+                {
+                    let process = &app.app_handle().state::<RemoteChecker>().0;
+                    let mut lock = process.lock().unwrap();
+                    if let Some(child) = lock.take() {
+                        let _ = child.stop();
+                        println!("🛑 Remote Scheduler killed on exit");
+                    }
                 }
                 app.exit(0);
             }
@@ -196,20 +190,86 @@ pub fn get_host_info() -> HostInfo {
     host_info
 }
 
-pub fn is_disallowed_device_connected() -> bool {
+pub fn is_disallowed_device_connected() -> Vec<USBDevice> {
     let connected_devices = usb_enumeration::enumerate(None, None);
-    if connected_devices.is_empty() {
-        println!("No devices connected");
-        return false;
-    }
-    connected_devices.iter().any(|device| {
-        if let Some(description) = &device.description {
-            INPUT_KEYWORDS
-                .iter()
-                .any(|keyword| description.contains(keyword))
-        } else {
-            println!("No description found for device: {:?}", device.description);
-            false
+    connected_devices
+        .into_iter()
+        .filter(|device| {
+            if let Some(description) = &device.description {
+                INPUT_KEYWORDS
+                    .iter()
+                    .any(|keyword| description.to_lowercase().contains(keyword))
+            } else {
+                false
+            }
+        })
+        .map(|device| USBDevice {
+            id: device.id.to_string(),
+            vendor_id: device.vendor_id,
+            product_id: device.product_id,
+            description: device.description.clone(),
+            serial_number: device.serial_number.clone(),
+        })
+        .collect()
+}
+
+fn is_udp_running() -> Vec<PortStatus> {
+    let mut status = vec![];
+    for port in 6_300..=6_535_u32 {
+        match UdpSocket::bind(format!("127.0.0.1:{}", port)) {
+            Ok(_) => continue, // If bind succeeds, port is free
+            // If bind fails, port is likely in use
+            Err(_) => {
+                println!(
+                    "Port {} refused connection, assuming Udp is running...",
+                    port
+                );
+                status.push(PortStatus::new(port, true))
+            }
         }
-    })
+    }
+    status
+}
+
+fn is_known_webrtc_program_running() -> Vec<ProcessIdentifier> {
+    let known_apps = vec!["zoom", "teams", "skype", "discord", "team viewer"];
+    let sys = System::new_all();
+    sys.processes()
+        .iter()
+        .filter_map(|(_, process)| {
+            let name = process.name().to_string_lossy();
+            if known_apps.iter().any(|app| name.contains(app)) {
+                Some(ProcessIdentifier {
+                    process_id: process.pid().as_u32() as i32,
+                    status: true, // running
+                    parent: process.parent().map(|p| p.as_u32() as i32),
+                    start_time: process.start_time(),
+                    run_time: process.run_time(),
+                    cpu_usage: process.cpu_usage(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn is_web_rtc_running() -> WebRtcReport {
+    WebRtcReport {
+        ports: is_udp_running(),
+        processes: is_known_webrtc_program_running(),
+    }
+}
+
+
+pub fn assign_seat_number_to_computer(){
+
+}
+
+pub fn change_seat_number(){
+
+}
+
+pub fn validate_otp() -> bool {
+    true
 }
