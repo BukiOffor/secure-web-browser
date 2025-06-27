@@ -1,12 +1,21 @@
 #![allow(unused_imports)]
+pub mod utils;
+
 use std::process;
+use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use tauri::menu::MenuBuilder;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
-pub mod utils;
+use utils::Triggers;
+
+use chrono::{Duration, Utc, Weekday};
+use tokio::sync::Mutex as TokioMutex;
+use tokio_task_scheduler::{scheduler, Scheduler, TaskBuilder};
+
+pub struct SchedulerState(pub Mutex<Option<Scheduler>>);
 
 struct AppState {
     child_process: Arc<Mutex<Option<CommandChild>>>,
@@ -25,6 +34,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(app_state)
+        .manage(SchedulerState(Mutex::default()))
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -134,6 +144,67 @@ pub fn run() {
             // get host info
             let host_info = utils::get_host_info();
             println!("Host Info: {:?}", host_info);
+
+            // create a channel for listeners
+            let (sender, rx) = channel::<Triggers>();
+
+            // create worker for input device check
+            let scheduler = Scheduler::new();
+
+            let app_handle = app.handle().clone();
+
+            // Define our recurring task.
+            // It runs every 30 seconds.
+            let task = TaskBuilder::new("input_checker", {
+                let input_checker_sender = sender.clone();
+                move || {
+                    let response = utils::is_disallowed_device_connected();
+                    if response {
+                        match input_checker_sender
+                            .clone()
+                            .send(Triggers::DisAllowedInputDectected)
+                        {
+                            Ok(_) => println!("send was successful"),
+                            Err(e) => eprintln!("send failed: {:?}", e),
+                        }
+                    }
+                    println!("Task executed!");
+                    Ok(())
+                }
+            })
+            .every_seconds(30)
+            .build();
+
+            tauri::async_runtime::spawn({
+                let app_handle = app_handle.clone();
+                async move {
+                    match scheduler.add_task(task).await {
+                        Ok(_) => println!("Task added successfully."),
+                        Err(e) => eprintln!("Error adding task: {:?}", e),
+                    }
+                    scheduler.start().await;
+                    let process = &app_handle.state::<SchedulerState>().0;
+                    let mut lock = process.lock().expect("could not lock scheduler");
+                    *lock = Some(scheduler);
+                    drop(lock);
+                }
+            });
+
+            // Controller to receive Triggers over a channel
+            tauri::async_runtime::spawn({
+                let app_handle = app_handle.clone();
+                async move {
+                    while let Ok(event) = rx.recv() {
+                        match event {
+                            Triggers::DisAllowedInputDectected => {
+                                println!("Disallowed input detected, exiting app");
+                                app_handle.exit(0);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            });
 
             Ok(())
         })

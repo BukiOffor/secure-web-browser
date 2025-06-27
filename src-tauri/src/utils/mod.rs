@@ -6,7 +6,16 @@ use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutEvent, ShortcutState};
 
-use crate::AppState;
+use crate::{AppState, SchedulerState};
+
+const INPUT_KEYWORDS: [&str; 4] = ["usb camera", "usb video", "mass storage", "hard disk"];
+
+#[derive(Debug, Clone, Serialize)]
+pub enum Triggers {
+    DisAllowedInputDectected,
+    UDPDectected,
+    RemoteApplicationDectected,
+}
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct HostInfo {
@@ -36,7 +45,7 @@ pub fn build_bindings(
                 println!("Ctrl-K Released!");
                 app.emit("show-password-prompt", ())
                     .expect("Failed to emit show-password-prompt");
-                
+
                 #[cfg(target_os = "windows")]
                 {
                     let child_process = app.app_handle().state::<AppState>().child_process.clone();
@@ -46,7 +55,12 @@ pub fn build_bindings(
                         println!("🛑 Sidecar killed on exit.");
                     }
                 }
-
+                let process = &app.app_handle().state::<SchedulerState>().0;
+                let mut lock = process.lock().unwrap();
+                if let Some(child) = lock.take() {
+                    let _ = child.stop();
+                    println!("🛑 Input Scheduler killed on exit");
+                }
                 app.exit(0);
             }
         }
@@ -180,4 +194,22 @@ pub fn get_host_info() -> HostInfo {
         host_info.serial_number = get_linux_serial();
     }
     host_info
+}
+
+pub fn is_disallowed_device_connected() -> bool {
+    let connected_devices = usb_enumeration::enumerate(None, None);
+    if connected_devices.is_empty() {
+        println!("No devices connected");
+        return false;
+    }
+    connected_devices.iter().any(|device| {
+        if let Some(description) = &device.description {
+            INPUT_KEYWORDS
+                .iter()
+                .any(|keyword| description.contains(keyword))
+        } else {
+            println!("No description found for device: {:?}", device.description);
+            false
+        }
+    })
 }
