@@ -207,7 +207,8 @@ fn is_udp_running() -> Vec<PortStatus> {
 
 fn is_known_webrtc_program_running() -> Vec<ProcessIdentifier> {
     let known_apps = vec!["zoom", "teams", "skype", "discord", "team viewer"];
-    let sys = System::new_all();
+    let mut sys = System::new_all();
+    sys.refresh_all();
     sys.processes()
         .iter()
         .filter_map(|(_, process)| {
