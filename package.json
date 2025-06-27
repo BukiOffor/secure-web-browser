@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "@tauri-apps/plugin-global-shortcut": "^2.2.1",
+    "@tauri-apps/plugin-notification": "^2.3.0",
     "@tauri-apps/plugin-updater": "^2.8.1",
     "execa": "^9.6.0"
   }

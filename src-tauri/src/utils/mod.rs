@@ -59,19 +59,17 @@ pub fn build_bindings(
 
 #[cfg(target_os = "windows")]
 pub fn is_virtual_machine() -> bool {
-    // let cpuid = raw_cpuid::CpuId::new();
-    //   if let Some(vf) = cpuid.get_vendor_info() {
-    //     let vendor = vf.as_str().to_lowercase();
-    //     return vendor.contains("vmware")
-    //         || vendor.contains("virtualbox")
-    //         || vendor.contains("qemu")
-    //         || vendor.contains("kvm")
-    //         || vendor.contains("microsoft hyper-v");
-    // }
+    let cpuid = raw_cpuid::CpuId::new();
+      if let Some(vf) = cpuid.get_vendor_info() {
+        let vendor = vf.as_str().to_lowercase();
+        return vendor.contains("vmware")
+            || vendor.contains("virtualbox")
+            || vendor.contains("qemu")
+            || vendor.contains("kvm")
+            || vendor.contains("microsoft hyper-v");
+    }
 
-    // false
-    use inside_vm::inside_vm;
-    inside_vm()
+    false
 }
 
 #[cfg(not(target_os = "windows"))]

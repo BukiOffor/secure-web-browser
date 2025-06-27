@@ -181,7 +181,7 @@ pub fn run() {
                             Err(e) => log::error!("send failed: {:?}", e),
                         }
                     }
-                    log::info!("Task executed!");
+                    log::info!("Task executed: No WebRTC connection Found!");
                     Ok(())
                 }
             })
@@ -192,7 +192,7 @@ pub fn run() {
                 let app_handle = app_handle.clone();
                 async move {
                     match remote_scheduler.add_task(remote_checker_task).await {
-                        Ok(_) => log::info!("Task added successfully."),
+                        Ok(_) => log::info!("Task: Remote Checker added successfully."),
                         Err(e) => log::error!("Error adding task: {:?}", e),
                     }
                     remote_scheduler.start().await;
@@ -226,7 +226,7 @@ pub fn run() {
                             Err(e) => log::error!("send failed: {:?}", e),
                         }
                     }
-                    log::info!("Task executed!");
+                    log::info!("Task executed: No Usb Devices Found!");
                     Ok(())
                 }
             })
@@ -237,7 +237,7 @@ pub fn run() {
                 let app_handle = app_handle.clone();
                 async move {
                     match scheduler.add_task(task).await {
-                        Ok(_) => log::info!("Task added successfully."),
+                        Ok(_) => log::info!("Task: Usb Device Checker added successfully."),
                         Err(e) => log::error!("Error adding task: {:?}", e),
                     }
                     scheduler.start().await;

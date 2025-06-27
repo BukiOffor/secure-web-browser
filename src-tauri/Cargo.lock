@@ -107,9 +107,9 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "inside-vm",
  "log",
  "mac_address",
+ "raw-cpuid",
  "serde",
  "serde_json",
  "sysinfo",
@@ -2064,12 +2064,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "inside-vm"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3518e289386082220db48c380f414722e25263af4160f8577c247dae0c6f3829"
-
-[[package]]
 name = "io-kit-sys"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3519,6 +3513,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
 dependencies = [
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "11.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6df7ab838ed27997ba19a4664507e6f82b41fe6e20be42929332156e5e85146"
+dependencies = [
+ "bitflags 2.9.1",
 ]
 
 [[package]]
