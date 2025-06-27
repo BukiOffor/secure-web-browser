@@ -33,6 +33,7 @@ chrono = "0.4"
 tokio = { version = "1", features = ["full"] }
 sysinfo = "0.35.2"
 
+
 [target.'cfg(target_os = "windows")'.dependencies]
 inside-vm = "0.2.0"
 windows = {version="0.60.0", features = ["Win32_System_RemoteDesktop", "Win32_Foundation", "Win32", "Win32_UI", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }

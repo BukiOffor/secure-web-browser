@@ -38,15 +38,16 @@ pub fn run() {
         .manage(SchedulerState(Mutex::default()))
         .manage(RemoteChecker(Mutex::default()))
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+          
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
+                    
+
             if cfg!(target_os = "windows") {
-                println!("Dectected Windows Environment: Running side car");
+               log::info!("Dectected Windows Environment: Running side car");
                 app.handle()
                     .plugin(tauri_plugin_shell::init())
                     .expect("Failed to initialize shell plugin for Windows");
@@ -68,25 +69,25 @@ pub fn run() {
                             while let Some(event) = rx.recv().await {
                                 match event {
                                     CommandEvent::Stdout(line) => {
-                                        println!(
+                                       log::info!(
                                             "[Sidecar stdout] {:?}",
                                             String::from_utf8_lossy(&line)
                                         );
                                     }
                                     CommandEvent::Stderr(line) => {
-                                        eprintln!(
+                                       log::error!(
                                             "[Sidecar stderr] {:?}",
                                             String::from_utf8_lossy(&line)
                                         );
                                     }
                                     CommandEvent::Error(err) => {
                                         let error_message = format!("[Sidecar error] {}", err);
-                                        eprintln!("{}", &error_message);
+                                       log::error!("{}", &error_message);
 
                                         process::exit(1); // Exit on error
                                     }
                                     CommandEvent::Terminated(_) => {
-                                        eprintln!("[Sidecar] Terminated.");
+                                       log::error!("[Sidecar] Terminated.");
                                         //process::exit(1); // Exit on error
                                     }
                                     _ => {}
@@ -95,7 +96,7 @@ pub fn run() {
                         });
                     }
                     Err(err) => {
-                        eprintln!("Failed to spawn sidecar process: {}", err);
+                       log::error!("Failed to spawn sidecar process: {}", err);
                         app.handle().exit(1);
                     }
                 }
@@ -139,13 +140,13 @@ pub fn run() {
 
             // Check if running in a guest machine on windows
             if utils::is_virtual_machine() || utils::is_running_in_rdp() {
-                println!("Running in a guest machine, exiting...");
+               log::info!("Running in a guest machine, exiting...");
                 app.handle().exit(0);
             }
 
             // get host info
             let host_info = utils::get_host_info();
-            println!("Host Info: {:?}", host_info);
+           log::info!("Host Info: {:?}", host_info);
 
             // create a channel for listeners
             let (sender, rx) = channel::<Triggers>();
@@ -170,11 +171,11 @@ pub fn run() {
                             .clone()
                             .send(Triggers::RemoteApplicationDectected(report))
                         {
-                            Ok(_) => println!("send was successful"),
-                            Err(e) => eprintln!("send failed: {:?}", e),
+                            Ok(_) =>log::info!("send was successful"),
+                            Err(e) =>log::error!("send failed: {:?}", e),
                         }
                     }
-                    println!("Task executed!");
+                   log::info!("Task executed!");
                     Ok(())
                 }
             })
@@ -185,8 +186,8 @@ pub fn run() {
                 let app_handle = app_handle.clone();
                 async move {
                     match remote_scheduler.add_task(remote_checker_task).await {
-                        Ok(_) => println!("Task added successfully."),
-                        Err(e) => eprintln!("Error adding task: {:?}", e),
+                        Ok(_) =>log::info!("Task added successfully."),
+                        Err(e) =>log::error!("Error adding task: {:?}", e),
                     }
                     remote_scheduler.start().await;
                     let process = &app_handle.state::<RemoteChecker>().0;
@@ -215,11 +216,11 @@ pub fn run() {
                             .clone()
                             .send(Triggers::DisAllowedInputDectected(response))
                         {
-                            Ok(_) => println!("send was successful"),
-                            Err(e) => eprintln!("send failed: {:?}", e),
+                            Ok(_) =>log::info!("send was successful"),
+                            Err(e) =>log::error!("send failed: {:?}", e),
                         }
                     }
-                    println!("Task executed!");
+                   log::info!("Task executed!");
                     Ok(())
                 }
             })
@@ -230,8 +231,8 @@ pub fn run() {
                 let app_handle = app_handle.clone();
                 async move {
                     match scheduler.add_task(task).await {
-                        Ok(_) => println!("Task added successfully."),
-                        Err(e) => eprintln!("Error adding task: {:?}", e),
+                        Ok(_) =>log::info!("Task added successfully."),
+                        Err(e) =>log::error!("Error adding task: {:?}", e),
                     }
                     scheduler.start().await;
                     let process = &app_handle.state::<SchedulerState>().0;
@@ -254,7 +255,7 @@ pub fn run() {
                     while let Ok(event) = rx.recv() {
                         match event {
                             Triggers::DisAllowedInputDectected(device) => {
-                                println!(
+                               log::info!(
                                     "Disallowed input detected with description: `{}`, exiting app",
                                     device[0].description.clone().unwrap_or("unnamed".into())
                                 );
