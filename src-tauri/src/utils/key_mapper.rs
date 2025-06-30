@@ -343,3 +343,47 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     Ok(())
 }
+
+
+use winreg::enums::*;
+use winreg::RegKey;
+
+fn disable_ctrl_alt_delete_features(enable: bool) -> std::io::Result<()> {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System";
+    let system_policies = hkcu.create_subkey(path)?;
+    
+    let value = if enable { 1u32 } else { 0u32 };
+    
+    system_policies.set_value("DisableTaskMgr", &value)?;
+    system_policies.set_value("DisableLockWorkstation", &value)?;
+    system_policies.set_value("DisableLogoff", &value)?;
+    system_policies.set_value("DisableChangePassword", &value)?;
+    
+    Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+    // Disable all Ctrl+Alt+Delete functions
+    disable_ctrl_alt_delete_features(true)?;
+    println!("Ctrl+Alt+Delete functions disabled");
+    
+    // To re-enable:
+    // disable_ctrl_alt_delete_features(false)?;
+    
+    Ok(())
+}
+
+
+fn disable_for_all_users(enable: bool) -> std::io::Result<()> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let path = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System";
+    let system_policies = hklm.create_subkey(path)?;
+    
+    let value = if enable { 1u32 } else { 0u32 };
+    
+    // Disable CAD requirement for login (Windows 10/11)
+    system_policies.set_value("DisableCAD", &value)?;
+    
+    Ok(())
+}
