@@ -1,6 +1,6 @@
 use std::process::Command;
 pub mod types;
-use crate::utils::types::{HostInfo, PortStatus, ProcessIdentifier, USBDevice, WebRtcReport};
+use crate::utils::types::{HostInfo, PortStatus, ProcessIdentifier, USBDevice, UdpEndpoint, WebRtcReport, RawUdpEndpoint};
 use crate::{AppState, RemoteChecker, SchedulerState};
 use mac_address::get_mac_address;
 use serde::Serialize;
@@ -9,6 +9,8 @@ use sysinfo::System;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutEvent, ShortcutState};
+use std::str;
+
 
 const INPUT_KEYWORDS: [&str; 2] = ["mass storage", "hard disk"];
 
@@ -186,6 +188,54 @@ pub fn is_disallowed_device_connected() -> Vec<USBDevice> {
         })
         .collect()
 }
+
+
+
+
+#[allow(dead_code)]
+fn get_udp_endpoints() -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
+    let output = Command::new("powershell")
+        .args([
+            "-Command",
+            "Get-NetUDPEndpoint | Select-Object -Property LocalAddress, LocalPort, CreationTime, Status, @{Name='ProcessName'; Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | ConvertTo-Json",
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        return Err(format!("PowerShell failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+
+    let json = String::from_utf8(output.stdout)?;
+    parse_udp_json(&json)
+}
+
+#[allow(dead_code)]
+fn parse_udp_json(json: &str) -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
+    let raw: serde_json::Value = serde_json::from_str(json)?;
+
+    let entries: Vec<RawUdpEndpoint> = if raw.is_array() {
+        serde_json::from_value(raw)?
+    } else {
+        // Sometimes PowerShell returns an object if only one result exists
+        vec![serde_json::from_value(raw)?]
+    };
+
+    let result = entries
+        .into_iter()
+        .map(|entry| UdpEndpoint {
+            local_address: entry.local_address,
+            local_port: entry.local_port,
+            process_name: entry.process_name,
+            creation_time: entry.creation_time,
+            status: entry.status,
+        })
+        .collect();
+
+    Ok(result)
+}
+
+
+
 
 fn is_udp_running() -> Vec<PortStatus> {
     let mut status = vec![];

@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 /// A status report for port numbers.
 /// if this type exists, it means a udp port is open.
@@ -65,4 +65,29 @@ pub struct USBDevice {
     pub description: Option<String>,
     /// Optional serial number
     pub serial_number: Option<String>,
+}
+
+
+
+#[derive(Debug, Deserialize)]
+pub struct RawUdpEndpoint {
+    #[serde(rename = "LocalAddress")]
+    pub local_address: String,
+    #[serde(rename = "LocalPort")]
+    pub local_port: u16,
+    #[serde(rename = "ProcessName")]
+    pub process_name: Option<String>,
+    #[serde(rename = "CreationTime")]
+    pub creation_time: String,
+    #[serde(rename = "Status")]
+    pub status: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct UdpEndpoint {
+    pub local_address: String,
+    pub local_port: u16,
+    pub process_name: Option<String>,
+    pub creation_time: String,
+    pub status: Option<String>,
 }

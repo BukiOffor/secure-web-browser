@@ -139,66 +139,6 @@ fn get_usb_devices() {
     }
 }
 
-#[derive(Debug)]
-struct UdpEndpoint {
-    local_address: String,
-    local_port: u16,
-    process_name: Option<String>,
-}
-
-use std::process::Command;
-use std::str;
-
-fn get_udp_endpoints() -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
-    let output = Command::new("powershell")
-        .args([
-            "-Command",
-            "Get-NetUDPEndpoint | Select-Object -Property LocalAddress, LocalPort, @{Name='ProcessName'; Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | ConvertTo-Json",
-        ])
-        .output()?;
-
-    if !output.status.success() {
-        return Err(format!("PowerShell failed: {}", String::from_utf8_lossy(&output.stderr)).into());
-    }
-
-    let json = String::from_utf8(output.stdout)?;
-    parse_udp_json(&json)
-}
-
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
-struct RawUdpEndpoint {
-    #[serde(rename = "LocalAddress")]
-    local_address: String,
-    #[serde(rename = "LocalPort")]
-    local_port: u16,
-    #[serde(rename = "ProcessName")]
-    process_name: Option<String>,
-}
-
-fn parse_udp_json(json: &str) -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
-    let raw: serde_json::Value = serde_json::from_str(json)?;
-
-    let entries: Vec<RawUdpEndpoint> = if raw.is_array() {
-        serde_json::from_value(raw)?
-    } else {
-        // Sometimes PowerShell returns an object if only one result exists
-        vec![serde_json::from_value(raw)?]
-    };
-
-    let result = entries
-        .into_iter()
-        .map(|entry| UdpEndpoint {
-            local_address: entry.local_address,
-            local_port: entry.local_port,
-            process_name: entry.process_name,
-        })
-        .collect();
-
-    Ok(result)
-}
-
 fn main() {
     match get_udp_endpoints() {
         Ok(endpoints) => {
@@ -314,7 +254,7 @@ pub fn set_remote_access(
                 "SYSTEM\\CurrentControlSet\\Control\\Terminal Server",
                 KEY_WRITE,
             )?;
-            terminal_server.set_value("fDenyTSConnections", &(if enable { 0u32 } else { 1u32 })?;
+            terminal_server.set_value("fDenyTSConnections", &(if enable { 0u32 } else { 1u32 }))?;
         }
         
         RemoteAccessFeature::RemoteAssistance => {
