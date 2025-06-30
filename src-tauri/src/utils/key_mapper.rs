@@ -214,3 +214,74 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 }
+
+
+#[derive(Debug)]
+struct NetstatEntry {
+    protocol: String,
+    local_address: String,
+    local_port: u16,
+    foreign_address: String,
+    foreign_port: u16,
+    state: Option<String>, // UDP has no state
+    pid: u32,
+}
+use std::process::Command;
+
+fn run_netstat() -> Result<String, Box<dyn std::error::Error>> {
+    let output = Command::new("netstat")
+        .args(["-a", "-n", "-o"])
+        .output()?;
+
+    if !output.status.success() {
+        return Err(format!("netstat failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+
+    Ok(String::from_utf8(output.stdout)?)
+}
+fn parse_netstat_output(output: &str) -> Vec<NetstatEntry> {
+    let mut entries = Vec::new();
+
+    for line in output.lines() {
+        let line = line.trim();
+        if line.starts_with("TCP") || line.starts_with("UDP") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+
+            // Handle TCP and UDP differently
+            if parts.len() >= 4 {
+                let protocol = parts[0].to_string();
+                let (local_ip, local_port) = split_address(parts[1]);
+                let (foreign_ip, foreign_port) = split_address(parts[2]);
+
+                let (state, pid) = if protocol == "TCP" && parts.len() >= 5 {
+                    (Some(parts[3].to_string()), parts[4].parse::<u32>().unwrap_or(0))
+                } else {
+                    (None, parts[3].parse::<u32>().unwrap_or(0))
+                };
+
+                entries.push(NetstatEntry {
+                    protocol,
+                    local_address: local_ip,
+                    local_port,
+                    foreign_address: foreign_ip,
+                    foreign_port,
+                    state,
+                    pid,
+                });
+            }
+        }
+    }
+
+    entries
+}
+
+fn split_address(addr: &str) -> (String, u16) {
+    if let Some(idx) = addr.rfind(':') {
+        let ip = &addr[..idx];
+        let port = &addr[idx + 1..];
+        let port = port.parse().unwrap_or(0);
+        (ip.to_string(), port)
+    } else {
+        (addr.to_string(), 0)
+    }
+}
