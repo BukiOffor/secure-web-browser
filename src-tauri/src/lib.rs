@@ -26,9 +26,9 @@ struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
-    println!("arguments: {:?}", args);
+    log::info!("arguments: {:?}", args);
     let is_kiosk = args.iter().any(|arg| arg == "kiosk");
-    println!("Running app in kiosk mode set to : {}", is_kiosk);
+    log::info!("Running app in kiosk mode set to : {}", is_kiosk);
     let child_process: Arc<Mutex<Option<CommandChild>>> = Arc::new(Mutex::default());
     let app_state = AppState { child_process };
 

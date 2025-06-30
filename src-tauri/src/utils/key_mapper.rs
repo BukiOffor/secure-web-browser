@@ -83,3 +83,58 @@ pub fn capture_key() -> Result<()> {
 //     CallNextHookEx(Some(HHOOK(null_mut())), code, w_param, l_param)
 // }
 // }
+
+
+use std::process::Command;
+use std::str;
+
+fn get_usb_devices() {
+    // Define the multi-line PowerShell script as a Rust string.
+    // Using a raw string literal r#"..."# is convenient for this.
+    let ps_script = r#"
+        # Get all Plug and Play devices
+        $pnpDevices = Get-WmiObject -Class Win32_PnPEntity | Select-Object Name, PNPDeviceID, Capabilities
+
+        # Filter for USB devices
+        $usbDevices = $pnpDevices | Where-Object { $_.PNPDeviceID -like "USB*" }
+
+        foreach ($device in $usbDevices) {
+            # The capability value for "Removable" is 4
+            $isRemovable = $device.Capabilities -contains 4
+
+            Write-Host "Device: $($device.Name)"
+            Write-Host "  PNPDeviceID: $($device.PNPDeviceID)"
+            if ($isRemovable) {
+                Write-Host "  Type: External (Removable)"
+            } else {
+                Write-Host "  Type: Internal"
+            }
+            Write-Host ""
+        }
+    "#;
+
+    println!("Running PowerShell script to find USB devices...");
+
+    // Execute the PowerShell command
+    let output = Command::new("powershell")
+        .arg("-NoProfile") // Skips loading the PowerShell profile for faster execution
+        .arg("-Command")   // Specifies that the next argument is a command
+        .arg(ps_script)    // Pass the entire script as the command
+        .output()
+        .expect("Failed to execute PowerShell command.");
+
+    // Check if the command was successful
+    if output.status.success() {
+        // Convert the output bytes to a string and print it.
+        // from_utf8_lossy is a safe way to handle non-UTF8 characters.
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("--- Script Output ---");
+        println!("{}", stdout);
+    } else {
+        // If the command failed, print the error details
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("--- PowerShell Error ---");
+        eprintln!("Exit Code: {}", output.status);
+        eprintln!("{}", stderr);
+    }
+}
