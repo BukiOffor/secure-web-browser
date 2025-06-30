@@ -285,3 +285,121 @@ fn split_address(addr: &str) -> (String, u16) {
         (addr.to_string(), 0)
     }
 }
+
+
+
+/// DISABLE REMOTE IN REGISTRY
+
+use std::error::Error;
+use winreg::enums::*;
+use winreg::RegKey;
+
+#[derive(Debug)]
+pub enum RemoteAccessFeature {
+    RemoteDesktop,
+    RemoteAssistance,
+    PowerShellRemoting,
+    AdminShares,
+}
+
+pub fn set_remote_access(
+    feature: RemoteAccessFeature,
+    enable: bool,
+) -> Result<(), Box<dyn Error>> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    
+    match feature {
+        RemoteAccessFeature::RemoteDesktop => {
+            let terminal_server = hklm.open_subkey_with_flags(
+                "SYSTEM\\CurrentControlSet\\Control\\Terminal Server",
+                KEY_WRITE,
+            )?;
+            terminal_server.set_value("fDenyTSConnections", &(if enable { 0u32 } else { 1u32 })?;
+        }
+        
+        RemoteAccessFeature::RemoteAssistance => {
+            let remote_assistance = hklm.open_subkey_with_flags(
+                "SYSTEM\\CurrentControlSet\\Control\\Remote Assistance",
+                KEY_WRITE,
+            )?;
+            remote_assistance.set_value("fAllowToGetHelp", &(if enable { 1u32 } else { 0u32 }))?;
+        }
+        
+        RemoteAccessFeature::PowerShellRemoting => {
+            let winrm = hklm.create_subkey(
+                "SOFTWARE\\Policies\\Microsoft\\Windows\\WinRM\\Service",
+            )?;
+            winrm.0.set_value("AllowRemoteShellAccess", &(if enable { 1u32 } else { 0u32 }))?;
+        }
+        
+        RemoteAccessFeature::AdminShares => {
+            let parameters = hklm.open_subkey_with_flags(
+                "SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters",
+                KEY_WRITE,
+            )?;
+            parameters.set_value("AutoShareWks", &(if enable { 1u32 } else { 0u32 }))?;
+            parameters.set_value("AutoShareServer", &(if enable { 1u32 } else { 0u32 }))?;
+        }
+    }
+    
+    Ok(())
+}
+
+pub fn is_feature_enabled(feature: RemoteAccessFeature) -> Result<bool, Box<dyn Error>> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    
+    match feature {
+        RemoteAccessFeature::RemoteDesktop => {
+            let terminal_server = hklm.open_subkey(
+                "SYSTEM\\CurrentControlSet\\Control\\Terminal Server",
+            )?;
+            let value: u32 = terminal_server.get_value("fDenyTSConnections")?;
+            Ok(value == 0)
+        }
+        
+        RemoteAccessFeature::RemoteAssistance => {
+            let remote_assistance = hklm.open_subkey(
+                "SYSTEM\\CurrentControlSet\\Control\\Remote Assistance",
+            )?;
+            let value: u32 = remote_assistance.get_value("fAllowToGetHelp")?;
+            Ok(value == 1)
+        }
+        
+        RemoteAccessFeature::PowerShellRemoting => {
+            let winrm = hklm.open_subkey(
+                "SOFTWARE\\Policies\\Microsoft\\Windows\\WinRM\\Service",
+            );
+            match winrm {
+                Ok(key) => {
+                    let value: u32 = key.get_value("AllowRemoteShellAccess").unwrap_or(0);
+                    Ok(value == 1)
+                }
+                Err(_) => Ok(false), // Key doesn't exist = disabled
+            }
+        }
+        
+        RemoteAccessFeature::AdminShares => {
+            let parameters = hklm.open_subkey(
+                "SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters",
+            )?;
+            let wks: u32 = parameters.get_value("AutoShareWks").unwrap_or(0);
+            let server: u32 = parameters.get_value("AutoShareServer").unwrap_or(0);
+            Ok(wks == 1 || server == 1)
+        }
+    }
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    // Example usage
+    println!("Current Remote Desktop status: {}", is_feature_enabled(RemoteAccessFeature::RemoteDesktop)?);
+    
+    // Disable Remote Desktop
+    set_remote_access(RemoteAccessFeature::RemoteDesktop, false)?;
+    println!("Disabled Remote Desktop");
+    
+    // Enable it back
+    set_remote_access(RemoteAccessFeature::RemoteDesktop, true)?;
+    println!("Enabled Remote Desktop");
+    
+    Ok(())
+}
