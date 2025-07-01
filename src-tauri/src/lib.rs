@@ -8,20 +8,19 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 use tauri::menu::MenuBuilder;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, Url};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio_task_scheduler::{Scheduler, TaskBuilder};
-
-// collapse these 2 schdeulers into 1 struct and manage it
-pub struct SchedulerState(pub Mutex<Option<Scheduler>>);
-pub struct RemoteChecker(pub Mutex<Option<Scheduler>>);
+use std::sync::RwLock;
+use tauri_plugin_store::StoreExt;
 
 struct AppState {
     child_process: Arc<Mutex<Option<CommandChild>>>,
 }
+struct InitState(RwLock<bool>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,12 +32,13 @@ pub fn run() {
     let app_state = AppState { child_process };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(app_state)
-        .manage(SchedulerState(Mutex::default()))
-        .manage(RemoteChecker(Mutex::default()))
+        .manage(InitState(RwLock::new(false)))
         .setup(|app| {
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
@@ -60,7 +60,6 @@ pub fn run() {
             {
                 log::info!("Disabling CAD commands");
                 utils::disable_cad_actions(true).expect("could not disable cad command");
-
             }
             // get host info
             let host_info = utils::get_host_info();
@@ -148,17 +147,32 @@ pub fn run() {
                 app.global_shortcut().register(minimized_shortcut)?;
             }
 
-            let window = app.get_webview_window("main").unwrap();
-            window.set_fullscreen(true)?;
-            window.set_decorations(false)?;
-            window.set_always_on_top(true)?;
-            window.set_resizable(false)?;
-            let menu = MenuBuilder::new(app.handle()).build()?;
-            window.set_menu(menu)?;
-            window.set_skip_taskbar(true)?;
-            window.set_visible_on_all_workspaces(true)?;
-            // prevent app from screen sharing
-            window.set_content_protected(true)?;
+            let store = app.store("store.json")?;
+
+            if let Some(value) = store.get("url"){
+                println!("{}", value); 
+                let server_url = value.as_object().unwrap().get("value").unwrap().as_str().unwrap();
+                log::info!("server: {}", server_url);
+                let window = app.get_webview_window("main").unwrap();
+                window.set_fullscreen(true)?;
+                window.set_decorations(false)?;
+                window.set_always_on_top(true)?;
+                window.set_resizable(false)?;
+                let menu = MenuBuilder::new(app.handle()).build()?;
+                window.set_menu(menu)?;
+                window.set_skip_taskbar(true)?;
+                window.set_visible_on_all_workspaces(true)?;
+                // prevent app from screen sharing
+                window.set_content_protected(true)?;
+
+                let url = Url::parse(&server_url)?;
+                window.navigate(url)?;
+
+            } else {
+                let window = app.get_webview_window("main").unwrap();
+                window.set_fullscreen(true)?;
+            }
+
 
             // create a channel for listeners
             let (sender, rx) = channel::<Triggers>();
@@ -195,17 +209,12 @@ pub fn run() {
             .build();
 
             tauri::async_runtime::spawn({
-                let app_handle = app_handle.clone();
                 async move {
                     match remote_scheduler.add_task(remote_checker_task).await {
                         Ok(_) => log::info!("Task: Remote Checker added successfully."),
                         Err(e) => log::error!("Error adding task: {:?}", e),
                     }
                     remote_scheduler.start().await;
-                    let process = &app_handle.state::<RemoteChecker>().0;
-                    let mut lock = process.lock().expect("could not lock scheduler");
-                    *lock = Some(remote_scheduler);
-                    drop(lock);
                 }
             });
 
@@ -240,17 +249,12 @@ pub fn run() {
             .build();
 
             tauri::async_runtime::spawn({
-                let app_handle = app_handle.clone();
                 async move {
                     match scheduler.add_task(task).await {
                         Ok(_) => log::info!("Task: Usb Device Checker added successfully."),
                         Err(e) => log::error!("Error adding task: {:?}", e),
                     }
                     scheduler.start().await;
-                    let process = &app_handle.state::<SchedulerState>().0;
-                    let mut lock = process.lock().expect("could not lock scheduler");
-                    *lock = Some(scheduler);
-                    drop(lock);
                 }
             });
 
@@ -289,12 +293,19 @@ pub fn run() {
             Ok(())
         })
         .on_window_event({
-            move |_window, event| {
+            move |window, event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
+                    let state = window.state::<InitState>();
+                    let state= state.0.read();
+                    if let Ok(result) = state{
+                        if *result {
+                            api.prevent_close();
+                        }
+                    } 
                 }
             }
         })
+        .invoke_handler(tauri::generate_handler![utils::commands::set_server,])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(move |app_handle, event| {
@@ -316,20 +327,6 @@ pub fn run() {
                 if let Some(child) = lock.take() {
                     let _ = child.kill();
                     println!("🛑 Sidecar killed on restart.");
-                }
-                let process = &app_handle.state::<SchedulerState>().0;
-                let mut lock = process.lock().unwrap();
-                if let Some(child) = lock.take() {
-                    let _ = child.stop();
-                    log::info!("🛑 Input Scheduler killed on exit");
-                }
-                {
-                    let process = &app_handle.state::<RemoteChecker>().0;
-                    let mut lock = process.lock().unwrap();
-                    if let Some(child) = lock.take() {
-                        let _ = child.stop();
-                        log::info!("🛑 Remote Scheduler killed on exit");
-                    }
                 }
             }
         });

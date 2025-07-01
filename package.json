@@ -4,13 +4,15 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node build.js"
+    "build": "node build.js && cd client && npm run build",
+    "dev": "node build.js && cd client && npm run dev"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
     "@tauri-apps/plugin-global-shortcut": "^2.2.1",
+    "@tauri-apps/plugin-http": "^2.5.0",
     "@tauri-apps/plugin-notification": "^2.3.0",
     "@tauri-apps/plugin-updater": "^2.8.1",
     "execa": "^9.6.0"

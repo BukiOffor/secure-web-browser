@@ -4,9 +4,10 @@
   "version": "0.1.2",
   "identifier": "com.multilent.dev",
   "build": {
-    "beforeBuildCommand": "npm run build",
-    "beforeDevCommand": "npm run build",
-    "frontendDist": "out"
+   "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../client/out"
   },
   "app": {
     "windows": [
@@ -15,8 +16,7 @@
         "width": 800,
         "height": 600,
         "resizable": true,
-        "fullscreen": false,
-        "url": "https://admin-examalpha.netlify.app"
+        "fullscreen": false
       }
     ],
     "security": {
@@ -37,7 +37,7 @@
     "externalBin": ["bin/mapper"],
     "windows": {
       "webviewInstallMode": {
-        "type": "offlineInstaller"
+        "type": "skip"
       }
     } 
   },

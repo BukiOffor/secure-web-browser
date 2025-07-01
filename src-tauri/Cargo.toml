@@ -32,6 +32,10 @@ chrono = "0.4"
 #tokio = { version = "1", features = ["full"] }
 sysinfo = "0.35.2"
 tauri-plugin-notification = "2"
+tauri-plugin-http = "2"
+thiserror = "2.0.12"
+derive_more = { version="2.0.1", features = ["full"] }
+tauri-plugin-store = "2"
 
 
 [target.'cfg(target_os = "windows")'.dependencies]

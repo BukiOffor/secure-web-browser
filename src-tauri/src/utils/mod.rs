@@ -1,16 +1,18 @@
 use std::process::Command;
+pub mod commands;
 pub mod types;
-use crate::utils::types::{HostInfo, PortStatus, ProcessIdentifier, USBDevice, UdpEndpoint, WebRtcReport, RawUdpEndpoint};
-use crate::{AppState, RemoteChecker, SchedulerState};
+use crate::utils::types::{
+    HostInfo, PortStatus, ProcessIdentifier, RawUdpEndpoint, USBDevice, UdpEndpoint, WebRtcReport,
+};
+use crate::AppState;
 use mac_address::get_mac_address;
 use serde::Serialize;
 use std::net::UdpSocket;
+use std::str;
 use sysinfo::System;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutEvent, ShortcutState};
-use std::str;
-
 
 const INPUT_KEYWORDS: [&str; 2] = ["mass storage", "hard disk"];
 
@@ -32,7 +34,7 @@ pub fn build_bindings(
             ShortcutState::Released => {
                 log::info!("Ctrl-K Released!");
                 app.emit("show-password-prompt", ())
-                    .expect("Failed to emit show-password-prompt"); 
+                    .expect("Failed to emit show-password-prompt");
                 app.exit(0);
             }
         }
@@ -62,7 +64,7 @@ pub fn build_bindings(
 #[cfg(target_os = "windows")]
 pub fn is_virtual_machine() -> bool {
     let cpuid = raw_cpuid::CpuId::new();
-      if let Some(vf) = cpuid.get_vendor_info() {
+    if let Some(vf) = cpuid.get_vendor_info() {
         let vendor = vf.as_str().to_lowercase();
         return vendor.contains("vmware")
             || vendor.contains("virtualbox")
@@ -189,9 +191,6 @@ pub fn is_disallowed_device_connected() -> Vec<USBDevice> {
         .collect()
 }
 
-
-
-
 #[allow(dead_code)]
 fn get_udp_endpoints() -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
     let output = Command::new("powershell")
@@ -202,7 +201,11 @@ fn get_udp_endpoints() -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
         .output()?;
 
     if !output.status.success() {
-        return Err(format!("PowerShell failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+        return Err(format!(
+            "PowerShell failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
     }
 
     let json = String::from_utf8(output.stdout)?;
@@ -233,9 +236,6 @@ fn parse_udp_json(json: &str) -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Er
 
     Ok(result)
 }
-
-
-
 
 fn is_udp_running() -> Vec<PortStatus> {
     let mut status = vec![];
@@ -285,8 +285,6 @@ pub fn is_web_rtc_running() -> WebRtcReport {
         processes: is_known_webrtc_program_running(),
     }
 }
-
-
 
 #[cfg(target_os = "windows")]
 pub fn disable_cad_actions(enable: bool) -> std::io::Result<()> {
