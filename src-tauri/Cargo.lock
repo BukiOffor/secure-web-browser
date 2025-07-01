@@ -124,6 +124,7 @@ dependencies = [
  "tokio-task-scheduler",
  "usb_enumeration",
  "windows 0.60.0",
+ "winreg",
 ]
 
 [[package]]
