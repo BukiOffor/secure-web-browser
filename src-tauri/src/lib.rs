@@ -62,6 +62,8 @@ pub fn run() {
 
             if cfg!(target_os = "windows") {
                 log::info!("Dectected Windows Environment: Running side car");
+                log::info!("Disabling CAD commands");
+                utils::disable_cad_actions(true).expect("could not disable cad command");
                 app.handle()
                     .plugin(tauri_plugin_shell::init())
                     .expect("Failed to initialize shell plugin for Windows");

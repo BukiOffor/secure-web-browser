@@ -286,6 +286,67 @@ pub fn is_web_rtc_running() -> WebRtcReport {
     }
 }
 
+
+
+#[cfg(target_os = "windows")]
+pub fn disable_cad_actions(enable: bool) -> std::io::Result<()> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    // Disable SignOut button on Action Card
+    {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let explorer_key =
+            hkcu.create_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer")?;
+        let value = if enable { 1u32 } else { 0u32 };
+        explorer_key.0.set_value("NoLogoff", &value)?; // 1 means disable
+        println!("Sign out disabled successfully.");
+    }
+
+    // Disable Actions on Local Machine
+    {
+        let hkcu = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System";
+        let system_policies = hkcu.create_subkey(path)?;
+
+        let value = if enable { 1u32 } else { 0u32 };
+
+        system_policies.0.set_value("DisableTaskMgr", &value)?;
+        system_policies
+            .0
+            .set_value("DisableLockWorkstation", &value)?;
+        system_policies.0.set_value("DisableLogoff", &value)?;
+        system_policies
+            .0
+            .set_value("DisableChangePassword", &value)?;
+        system_policies
+            .0
+            .set_value("HideFastUserSwitching", &value)?;
+    }
+
+    // Disable Actions for User
+    {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System";
+        let system_policies = hkcu.create_subkey(path)?;
+
+        let value = if enable { 1u32 } else { 0u32 };
+
+        system_policies.0.set_value("DisableTaskMgr", &value)?;
+        system_policies
+            .0
+            .set_value("DisableLockWorkstation", &value)?;
+        system_policies.0.set_value("DisableLogoff", &value)?;
+        system_policies
+            .0
+            .set_value("DisableChangePassword", &value)?;
+        system_policies
+            .0
+            .set_value("HideFastUserSwitching", &value)?;
+    }
+
+    Ok(())
+}
+
 pub fn assign_seat_number_to_computer() {}
 
 pub fn change_seat_number() {}
