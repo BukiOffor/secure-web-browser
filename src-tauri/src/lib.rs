@@ -1,9 +1,10 @@
 #![allow(unused_imports)]
 pub mod utils;
 
-use crate::utils::types::Triggers;
+use crate::utils::types::{ModuleError, Triggers};
 use std::process;
 use std::sync::mpsc::channel;
+use std::sync::RwLock;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -13,9 +14,8 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut}
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
-use tokio_task_scheduler::{Scheduler, TaskBuilder};
-use std::sync::RwLock;
 use tauri_plugin_store::StoreExt;
+use tokio_task_scheduler::{Scheduler, TaskBuilder};
 
 struct AppState {
     child_process: Arc<Mutex<Option<CommandChild>>>,
@@ -147,33 +147,8 @@ pub fn run() {
                 app.global_shortcut().register(minimized_shortcut)?;
             }
 
-            let store = app.store("store.json")?;
-
-            if let Some(value) = store.get("url"){
-                println!("{}", value); 
-                let server_url = value.as_object().unwrap().get("value").unwrap().as_str().unwrap();
-                log::info!("server: {}", server_url);
-                let window = app.get_webview_window("main").unwrap();
-                window.set_fullscreen(true)?;
-                window.set_decorations(false)?;
-                window.set_always_on_top(true)?;
-                window.set_resizable(false)?;
-                let menu = MenuBuilder::new(app.handle()).build()?;
-                window.set_menu(menu)?;
-                window.set_skip_taskbar(true)?;
-                window.set_visible_on_all_workspaces(true)?;
-                // prevent app from screen sharing
-                window.set_content_protected(true)?;
-
-                let url = Url::parse(&server_url)?;
-                window.navigate(url)?;
-
-            } else {
-                let window = app.get_webview_window("main").unwrap();
-                window.set_fullscreen(true)?;
-            }
-
-
+            let window = app.get_webview_window("main").unwrap();
+            window.set_fullscreen(true)?;
             // create a channel for listeners
             let (sender, rx) = channel::<Triggers>();
             let app_handle = app.handle().clone();
@@ -296,16 +271,16 @@ pub fn run() {
             move |window, event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     let state = window.state::<InitState>();
-                    let state= state.0.read();
-                    if let Ok(result) = state{
+                    let state = state.0.read();
+                    if let Ok(result) = state {
                         if *result {
                             api.prevent_close();
                         }
-                    } 
+                    }
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![utils::commands::set_server,])
+        .invoke_handler(tauri::generate_handler![utils::commands::set_server, utils::commands::server_url])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(move |app_handle, event| {

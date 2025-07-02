@@ -1,12 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 export default function ServerForm() {
   const [serverUrl, setServerUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
+
+
+   useEffect(() => {
+    const fetchUrl = async () => {
+      try {
+        const result = await invoke<any>('server_url');
+        if (result != null) {
+          setServerUrl(result);
+        }
+        //console.log('Fetched URL from Tauri:', result);
+      } catch (error) {
+        console.error('Failed to fetch URL from Tauri:', error);
+      }
+    };
+
+    fetchUrl(); 
+  }, []);
+
+
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,12 +40,13 @@ export default function ServerForm() {
         url: serverUrl,
       });
 
-      setResponse(`Success: waiting for redirect ...`);
+      setResponse(`Success: waiting for redirect ...`);  
     } catch (error: any) {
       console.log("Error: ", error)
       setResponse(`Error: ${error.message || 'Failed to connect.'}`);
-    } finally {
       setLoading(false);
+    } finally {
+      //setLoading(false);
     }
   };
 
@@ -51,13 +74,40 @@ export default function ServerForm() {
           required
         />
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition"
-        >
-          {loading ? 'Connecting...' : 'Submit'}
-        </button>
+       <button
+  type="submit"
+  disabled={loading}
+  className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition flex items-center justify-center"
+>
+  {loading ? (
+    <>
+      <svg
+        className="animate-spin h-5 w-5 mr-2 text-white"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+        />
+      </svg>
+      Connecting...
+    </>
+  ) : (
+    'Submit'
+  )}
+</button>
+
 
         {response && (
           <p className="mt-4 text-sm text-center text-gray-600">
