@@ -345,6 +345,31 @@ pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleErro
         Err(ModuleError::Internal("Request to Server failed".into()))
     }
 }
+#[cfg(target_os = "windows")]
+pub fn get_current_display() -> Vec<String> {
+    // Define the PowerShell command
+    let ps_script = r#"Get-WmiObject -Namespace root\wmi -Query "Select * from WmiMonitorConnectionParams""#;
+    // Run PowerShell
+    let output = Command::new("powershell")
+        .args(["-Command", ps_script])
+        .output()
+        .expect("Failed to execute PowerShell");
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // Split output into blocks per display
+        let display_blocks: Vec<&str> = stdout
+            .split("\r\n\r\n") // double newline between objects
+            .filter(|block| block.to_string().contains("InstanceName")) // crude filter to ensure it's a valid object
+            .collect();
+        let count = display_blocks.len();
+        log::info!("Number of connected displays: {}", count);
+        display_blocks.into_iter().map(|s| s.to_string()).collect()
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::error!("PowerShell error:\n{}", stderr);
+        vec![]
+    }
+}
 
 pub fn assign_seat_number_to_computer() {}
 
