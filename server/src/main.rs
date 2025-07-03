@@ -11,6 +11,12 @@ pub struct Response {
     pub port: u16,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PasswordResponse {
+    pub message: String,
+    pub ip_addr: String,
+}
+
 #[get("/validate")]
 async fn root() -> impl Responder {
    println!("Validating server information");
@@ -23,12 +29,23 @@ async fn root() -> impl Responder {
     })
 }
 
+#[get("/password")]
+async fn get_password() -> impl Responder {
+   println!("Validating server information");
+   HttpResponse::Ok().json(
+   PasswordResponse{
+    message: "a new password".into(),
+    ip_addr: "192.67.4.1".into()
+   })
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     println!("Starting HTTP server at port 8080");
     HttpServer::new(|| {
         App::new()
             .service(root)
+            .service(get_password)
     })
     .bind("127.0.0.1:8080")?
     .run()

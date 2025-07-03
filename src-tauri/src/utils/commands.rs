@@ -5,11 +5,12 @@ use serde_json::json;
 use tauri::Emitter;
 use tauri::{menu::MenuBuilder, Manager, Url};
 use tauri_plugin_http::reqwest;
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_store::StoreExt;
 
 #[tauri::command]
 pub async fn set_server(app: tauri::AppHandle, url: String) -> Result<(), ModuleError> {
-    println!("🚨 Request Logged!");
+    log::info!("🚨 Request Logged!");
     let response = reqwest::get(format!("{}:8080/validate", url.clone())).await?;
     let status = response.status();
     let body = response
@@ -51,12 +52,19 @@ pub async fn set_server(app: tauri::AppHandle, url: String) -> Result<(), Module
 
 #[tauri::command]
 pub fn server_url(app: tauri::AppHandle) -> Result<Option<String>, ModuleError> {
+    match get_server_url(&app) {
+        Ok(url) => Ok(Some(url)),
+        Err(ModuleError::Internal(msg)) if msg == "Couldn't get server url" => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn get_server_url(app: &tauri::AppHandle) -> Result<String, ModuleError> {
     let store = app
         .store("store.json")
         .map_err(|e| ModuleError::Internal(e.to_string()))?;
 
     if let Some(value) = store.get("url") {
-        println!("{}", value);
         let server_url = value
             .as_object()
             .unwrap()
@@ -65,7 +73,7 @@ pub fn server_url(app: tauri::AppHandle) -> Result<Option<String>, ModuleError> 
             .as_str()
             .unwrap();
 
-        return Ok(Some(server_url.to_string()));
+        return Ok(server_url.to_string());
     };
-    Ok(None)
+    Err(ModuleError::Internal("Couldn't get server url".into()))
 }

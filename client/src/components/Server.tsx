@@ -24,7 +24,7 @@ export default function ServerForm() {
     };
 
     fetchUrl(); 
-  }, []);
+  }, [serverUrl]);
 
 
 

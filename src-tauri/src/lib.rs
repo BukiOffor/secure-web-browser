@@ -1,20 +1,21 @@
 #![allow(unused_imports)]
 pub mod utils;
 
-use crate::utils::types::{ModuleError, Triggers};
+use crate::utils::types::Triggers;
 use std::process;
 use std::sync::mpsc::channel;
 use std::sync::RwLock;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use tauri::menu::MenuBuilder;
+use chrono::Utc;
 use tauri::{Emitter, Manager, Url};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_store::StoreExt;
+use tokio_schedule::{every, Job};
 use tokio_task_scheduler::{Scheduler, TaskBuilder};
 
 struct AppState {
@@ -50,6 +51,8 @@ pub fn run() {
                 Ok(_) => log::info!("Permission Requested for Application"),
                 Err(err) => log::error!("Couldn't request permision: {}", err),
             }
+            app.notification().builder().show().unwrap();
+
             // Check if running in a guest machine on windows
             if utils::is_virtual_machine() || utils::is_running_in_rdp() {
                 log::info!("Running in a guest machine, exiting...");
@@ -153,46 +156,29 @@ pub fn run() {
             let (sender, rx) = channel::<Triggers>();
             let app_handle = app.handle().clone();
 
+            // let weekly = tokio_schedule::Job::perform(tokio_schedule::every(1).second()
+            //     .in_timezone(&Utc), || async { println!("Every Second job") });
+            // tauri::async_runtime::spawn(weekly);
+
             //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            ////////////////////////////////////                    SCHEDULE TASK FOR REMOTE RTC CHECK                           //////////////////////////////////////////
+            ////////////////////////////////////                    SCHEDULE TASK FOR PASSWORD QUERYING                           //////////////////////////////////////////
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-            // create worker for input device check
-            let remote_scheduler = Scheduler::new();
-
-            // It runs every 30 seconds.
-            let remote_checker_task = TaskBuilder::new("remote_checker", {
-                let input_checker_sender = sender.clone();
-                move || {
-                    let report = utils::is_web_rtc_running();
-                    if report.is_running() {
-                        match input_checker_sender
-                            .clone()
-                            .send(Triggers::RemoteApplicationDectected(report))
-                        {
-                            Ok(_) => log::info!("send was successful"),
-                            Err(e) => log::error!("send failed: {:?}", e),
-                        }
-                    }
-                    log::info!("Task executed: No WebRTC connection Found!");
-                    Ok(())
-                }
-            })
-            .every_seconds(30)
-            .build();
-
-            tauri::async_runtime::spawn({
+                
+            let app_handle_for_password = app_handle.clone();
+            let query_password = every(5).minutes().at(0).in_timezone(&Utc)
+            .perform(move || {
+                let handle = app_handle_for_password.clone();
                 async move {
-                    match remote_scheduler.add_task(remote_checker_task).await {
-                        Ok(_) => log::info!("Task: Remote Checker added successfully."),
-                        Err(e) => log::error!("Error adding task: {:?}", e),
+                    match utils::query_password_for_server(&handle).await {
+                        Ok(_) => log::info!("Task: Querying Password was Successful"),
+                        Err(e) => log::error!("Querying Password Error: {}", e),
                     }
-                    remote_scheduler.start().await;
                 }
             });
-
+            tauri::async_runtime::spawn(query_password);
             //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ////////////////////////////////////                    SCHEDULE TASK FOR USB DEVICES                           ///////////////////////////////////////////////
@@ -247,7 +233,7 @@ pub fn run() {
                         match event {
                             Triggers::DisAllowedInputDectected(device) => {
                                 log::info!(
-                                    "Disallowed input detected with description: `{}`, exiting app",
+                                    "Disallowed Input Detected with Description: `{}`, Exiting App",
                                     device[0].description.clone().unwrap_or("unnamed".into())
                                 );
                                 app_handle
@@ -257,7 +243,7 @@ pub fn run() {
                                     .body("An external device has been attached to your device")
                                     .show()
                                     .unwrap();
-                                sleep(Duration::from_secs(5));
+                                sleep(Duration::from_secs(9));
                                 app_handle.exit(0);
                             }
                             _ => {}
@@ -265,6 +251,7 @@ pub fn run() {
                     }
                 }
             });
+            //app.notification().builder().title("title").body("body").show().unwrap();
             Ok(())
         })
         .on_window_event({

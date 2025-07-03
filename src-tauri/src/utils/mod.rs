@@ -1,6 +1,7 @@
 use std::process::Command;
 pub mod commands;
 pub mod types;
+use crate::utils::commands::get_server_url;
 use crate::utils::types::{
     HostInfo, ModuleError, PortStatus, ProcessIdentifier, RawUdpEndpoint, ServerValidatorResponse,
     USBDevice, UdpEndpoint, WebRtcReport,
@@ -391,6 +392,47 @@ pub fn navigate_and_adjust_window(app: &tauri::AppHandle, url: Url) -> Result<()
         .navigate(url)
         .map_err(|e| ModuleError::Internal(format!("Failed to navigate to url: {}", e)))?;
     Ok(())
+}
+
+pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleError>{
+    log::info!("🚨 Request for Pasword Logged!");
+    let url = get_server_url(&app)?;
+    let response = reqwest::get(format!("{}:8080/password", url)).await?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+    if status.is_success() {
+        let response: types::PasswordResponse =
+            serde_json::from_str(&body).map_err(|e| format!("Failed to parse JSON: {}", e))?;      
+        let password = response.message;  
+        let store = app
+            .store("store.json")
+            .map_err(|e| ModuleError::Internal(format!("Failed to get store: {}", e)))?;
+        if let Some(value) = store.get("password") {
+        let old_password = value
+            .as_object()
+            .unwrap()
+            .get("value")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        if old_password.eq(&password) {
+                log::info!("Password has not changed, sleeping ...");
+                return Ok(())
+            }    
+        }
+        log::info!("Password has changed, Writing new password ...");
+        store.set("password", json!({"value": password}));
+        store
+            .save()
+            .map_err(|e| ModuleError::Internal(format!("Failed to save store: {}", e)))?;
+        Ok(())
+    } else {
+        Err(ModuleError::Internal("Request to Server failed".into()))
+    }
 }
 
 pub fn assign_seat_number_to_computer() {}
