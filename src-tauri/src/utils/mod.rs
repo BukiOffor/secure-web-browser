@@ -42,12 +42,12 @@ pub fn build_bindings(
                 app.emit("start::exit", ())
                     .expect("Failed to emit show-password-prompt");
                 let state = app.state::<InitState>();
-                    let state = state.0.read();
-                    if let Ok(result) = state {
-                        if *result {
-                            app.exit(0);
-                        }
+                let state = state.0.read();
+                if let Ok(result) = state {
+                    if *result {
+                        app.exit(0);
                     }
+                }
             }
         }
     } else if shortcut == cltr_alt_delete_shortcut {
@@ -345,28 +345,61 @@ pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleErro
         Err(ModuleError::Internal("Request to Server failed".into()))
     }
 }
-#[cfg(target_os = "windows")]
-pub fn get_current_display() -> Vec<String> {
-    // Define the PowerShell command
-    let ps_script = r#"Get-WmiObject -Namespace root\wmi -Query "Select * from WmiMonitorConnectionParams""#;
-    // Run PowerShell
-    let output = Command::new("powershell")
-        .args(["-Command", ps_script])
-        .output()
-        .expect("Failed to execute PowerShell");
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        // Split output into blocks per display
-        let display_blocks: Vec<&str> = stdout
-            .split("\r\n\r\n") // double newline between objects
-            .filter(|block| block.to_string().contains("InstanceName")) // crude filter to ensure it's a valid object
-            .collect();
-        let count = display_blocks.len();
-        log::info!("Number of connected displays: {}", count);
-        display_blocks.into_iter().map(|s| s.to_string()).collect()
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        log::error!("PowerShell error:\n{}", stderr);
+pub fn get_current_display() -> Result<Vec<String>, ModuleError> {
+    #[cfg(target_os = "windows")]
+    {
+        // Define the PowerShell command
+        let ps_script = r#"Get-WmiObject -Namespace root\wmi -Query "Select * from WmiMonitorConnectionParams""#;
+        // Run PowerShell
+        let output = Command::new("powershell")
+            .args(["-Command", ps_script])
+            .output()
+            .map_err(|e| ModuleError::Internal(format!("Failed to execute PowerShell: {}", e)))?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Split output into blocks per display
+            let display_blocks: Vec<&str> = stdout
+                .split("\r\n\r\n") // double newline between objects
+                .filter(|block| block.to_string().contains("InstanceName"))
+                .collect();
+            let count = display_blocks.len();
+            log::info!("Number of connected displays: {}", count);
+            Ok(display_blocks.into_iter().map(|s| s.to_string()).collect())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            log::error!("PowerShell error:\n{}", stderr);
+            Ok(vec![])
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::display::CGDisplay;
+        let display_count = CGDisplay::active_displays()
+            .map_err(|e| ModuleError::Internal(format!("Could not get displays: {}", e)))?;
+
+        let flag = display_count.iter().any(|id| {
+            let screen = CGDisplay::new(*id);
+            !screen.is_builtin() && screen.is_active()
+        });
+
+        if flag {
+            let output = Command::new("system_profiler")
+                .arg("SPDisplaysDataType")
+                .output()
+                .map_err(|e| ModuleError::Internal(e.to_string()))?;
+
+            let output_str = String::from_utf8_lossy(&output.stdout).to_string();
+            let mut response = vec![];
+            display_count.iter().for_each(|_| {
+                response.push(output_str.clone());
+            });
+            return Ok(response);
+        } else {
+            return Ok(vec![]);
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
         vec![]
     }
 }

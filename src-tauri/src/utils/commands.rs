@@ -12,11 +12,11 @@ use tauri_plugin_store::StoreExt;
 pub async fn set_server(app: tauri::AppHandle, url: String) -> Result<(), ModuleError> {
     log::info!("🚨 Request Logged!");
     let server_url = format!("{}:8080/validate", url.clone());
-      let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10)) 
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| ModuleError::RequsetError(e))?;
-    
+
     let response = client
         .get(&server_url)
         .send()
@@ -90,7 +90,7 @@ pub fn get_server_url(app: &tauri::AppHandle) -> Result<String, ModuleError> {
 
 #[tauri::command]
 pub async fn exit_exam(app: tauri::AppHandle, password: String) -> Result<bool, ModuleError> {
-   let store = app
+    let store = app
         .store("store.json")
         .map_err(|e| ModuleError::Internal(e.to_string()))?;
 
@@ -106,14 +106,18 @@ pub async fn exit_exam(app: tauri::AppHandle, password: String) -> Result<bool, 
             app.notification()
                 .builder()
                 .title("Exiting")
-                .body("A user has requested exit and app will shut down in 5 seconds").show().unwrap();
-            return Ok(true)
-        }else {
+                .body("A user has requested exit and app will shut down in 5 seconds")
+                .show()
+                .unwrap();
+            return Ok(true);
+        } else {
             Ok(false)
         }
     } else {
         utils::query_password_for_server(&app).await?;
         log::error!("Couldn't find password in store, making a new request ...");
-        Err(ModuleError::Internal("Couldn't find password in store".into()))
+        Err(ModuleError::Internal(
+            "Couldn't find password in store".into(),
+        ))
     }
 }

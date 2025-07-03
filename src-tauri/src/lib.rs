@@ -177,6 +177,41 @@ pub fn run() {
                 }
             });
             tauri::async_runtime::spawn(query_password);
+
+            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            ////////////////////////////////////                    SCHEDULE TASK FOR QUERYING DISPLAY                          //////////////////////////////////////////
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            let display_sender = sender.clone();
+            let check_displays = every(1).minutes().at(0).in_timezone(&Utc).perform(move || {
+                let display_sender = display_sender.clone();
+                async move {
+                    match utils::get_current_display() {
+                        Ok(displays) => {
+                            if displays.len() > 1 {
+                                log::info!("Task: Found additional display");
+                                match display_sender
+                                    .send(Triggers::AdditionalDisplayDectected(displays.clone()))
+                                {
+                                    Ok(_) => {
+                                        log::info!("Display Trigger has been sent succesfully")
+                                    }
+                                    Err(e) => {
+                                        log::error!("Display Send Failed: {:?}", e)
+                                    }
+                                }
+                            }else {
+                            log::info!("Task: Did not find any additional display")
+                            }
+                        }
+                        Err(e) => log::error!("Checking Display Error: {}", e),
+                    }
+                }
+            });
+            tauri::async_runtime::spawn(check_displays);
+
             //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ////////////////////////////////////                    SCHEDULE TASK FOR USB DEVICES                           ///////////////////////////////////////////////
@@ -241,9 +276,22 @@ pub fn run() {
                                     .body("An external device has been attached to your device")
                                     .show()
                                     .unwrap();
-                                sleep(Duration::from_secs(9));
+                                tokio::time::sleep(Duration::from_secs(9)).await;
                                 app_handle.exit(0);
-                            }
+                            },
+                            Triggers::AdditionalDisplayDectected(displays) => {
+                                 log::info!(
+                                    "Disallowed Display Detected {} :, Exiting App",displays[1]);
+                                app_handle
+                                    .notification()
+                                    .builder()
+                                    .title("Device Compromised")
+                                    .body("An external device has been attached to your device")
+                                    .show()
+                                    .unwrap();
+                                tokio::time::sleep(Duration::from_secs(9)).await;
+                                app_handle.exit(0);
+                            },
                             _ => {}
                         }
                     }

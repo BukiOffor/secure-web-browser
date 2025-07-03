@@ -42,8 +42,8 @@ impl WebRtcReport {
 #[derive(Debug, Clone, Serialize)]
 pub enum Triggers {
     DisAllowedInputDectected(Vec<USBDevice>),
-    UDPDectected,
-    RemoteApplicationDectected(WebRtcReport),
+    AdditionalDisplayDectected(Vec<String>),
+    Default,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
