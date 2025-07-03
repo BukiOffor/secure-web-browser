@@ -116,7 +116,7 @@ pub struct PasswordResponse {
 
 #[derive(Debug, Display, thiserror::Error)]
 pub enum ModuleError {
-    #[display("Internal server error: {}", _0)]
+    #[display("Internal Server Error: {}", _0)]
     Internal(String),
 
     RequsetError(#[from] reqwest::Error),

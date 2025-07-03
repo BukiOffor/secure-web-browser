@@ -34,7 +34,7 @@ async fn get_password() -> impl Responder {
    println!("Validating server information");
    HttpResponse::Ok().json(
    PasswordResponse{
-    message: "a new password".into(),
+    message: "password".into(),
     ip_addr: "192.67.4.1".into()
    })
 }

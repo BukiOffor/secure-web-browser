@@ -11,6 +11,8 @@
   "permissions": [
     "global-shortcut:default",
     "updater:default",
-    "notification:default"
+    "notification:default",
+    "process:default"
+
   ]
 }

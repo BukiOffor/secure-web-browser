@@ -51,7 +51,7 @@ pub fn run() {
                 Ok(_) => log::info!("Permission Requested for Application"),
                 Err(err) => log::error!("Couldn't request permision: {}", err),
             }
-            app.notification().builder().show().unwrap();
+            //app.notification().builder().show().unwrap();
 
             // Check if running in a guest machine on windows
             if utils::is_virtual_machine() || utils::is_running_in_rdp() {
@@ -267,7 +267,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             utils::commands::set_server,
-            utils::commands::server_url
+            utils::commands::server_url,
+            utils::commands::exit_exam,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

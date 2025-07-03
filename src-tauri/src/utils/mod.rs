@@ -39,9 +39,15 @@ pub fn build_bindings(
             }
             ShortcutState::Released => {
                 log::info!("Ctrl-K Released!");
-                app.emit("show-password-prompt", ())
+                app.emit("start::exit", ())
                     .expect("Failed to emit show-password-prompt");
-                app.exit(0);
+                let state = app.state::<InitState>();
+                    let state = state.0.read();
+                    if let Ok(result) = state {
+                        if *result {
+                            app.exit(0);
+                        }
+                    }
             }
         }
     } else if shortcut == cltr_alt_delete_shortcut {
