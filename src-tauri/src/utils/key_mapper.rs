@@ -387,3 +387,100 @@ fn disable_for_all_users(enable: bool) -> std::io::Result<()> {
     
     Ok(())
 }
+
+
+
+// #[allow(dead_code)]
+// fn get_udp_endpoints() -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
+//     let output = Command::new("powershell")
+//         .args([
+//             "-Command",
+//             "Get-NetUDPEndpoint | Select-Object -Property LocalAddress, LocalPort, CreationTime, Status, @{Name='ProcessName'; Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | ConvertTo-Json",
+//         ])
+//         .output()?;
+
+//     if !output.status.success() {
+//         return Err(format!(
+//             "PowerShell failed: {}",
+//             String::from_utf8_lossy(&output.stderr)
+//         )
+//         .into());
+//     }
+
+//     let json = String::from_utf8(output.stdout)?;
+//     parse_udp_json(&json)
+// }
+
+// #[allow(dead_code)]
+// fn parse_udp_json(json: &str) -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
+//     let raw: serde_json::Value = serde_json::from_str(json)?;
+
+//     let entries: Vec<RawUdpEndpoint> = if raw.is_array() {
+//         serde_json::from_value(raw)?
+//     } else {
+//         // Sometimes PowerShell returns an object if only one result exists
+//         vec![serde_json::from_value(raw)?]
+//     };
+
+//     let result = entries
+//         .into_iter()
+//         .map(|entry| UdpEndpoint {
+//             local_address: entry.local_address,
+//             local_port: entry.local_port,
+//             process_name: entry.process_name,
+//             creation_time: entry.creation_time,
+//             status: entry.status,
+//         })
+//         .collect();
+
+//     Ok(result)
+// }
+
+// fn is_udp_running() -> Vec<PortStatus> {
+//     let mut status = vec![];
+//     for port in 6_300..=6_535_u32 {
+//         match UdpSocket::bind(format!("127.0.0.1:{}", port)) {
+//             Ok(_) => continue, // If bind succeeds, port is free
+//             // If bind fails, port is likely in use
+//             Err(_) => {
+//                 log::info!(
+//                     "Port {} refused connection, assuming Udp is running...",
+//                     port
+//                 );
+//                 status.push(PortStatus::new(port, true))
+//             }
+//         }
+//     }
+//     status
+// }
+
+// fn is_known_webrtc_program_running() -> Vec<ProcessIdentifier> {
+//     let known_apps = vec!["zoom", "teams", "skype", "discord", "team viewer"];
+//     let mut sys = System::new_all();
+//     sys.refresh_all();
+//     sys.processes()
+//         .iter()
+//         .filter_map(|(_, process)| {
+//             let name = process.name().to_string_lossy();
+//             if known_apps.iter().any(|app| name.contains(app)) {
+//                 Some(ProcessIdentifier {
+//                     process_id: process.pid().as_u32() as i32,
+//                     status: true, // running
+//                     parent: process.parent().map(|p| p.as_u32() as i32),
+//                     start_time: process.start_time(),
+//                     run_time: process.run_time(),
+//                     cpu_usage: process.cpu_usage(),
+//                 })
+//             } else {
+//                 None
+//             }
+//         })
+//         .collect()
+// }
+
+// pub fn is_web_rtc_running() -> WebRtcReport {
+//     WebRtcReport {
+//         ports: is_udp_running(),
+//         processes: is_known_webrtc_program_running(),
+//     }
+// }

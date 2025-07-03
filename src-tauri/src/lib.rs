@@ -2,13 +2,13 @@
 pub mod utils;
 
 use crate::utils::types::Triggers;
+use chrono::Utc;
 use std::process;
 use std::sync::mpsc::channel;
 use std::sync::RwLock;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use chrono::Utc;
 use tauri::{Emitter, Manager, Url};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tauri_plugin_notification::NotificationExt;
@@ -166,10 +166,8 @@ pub fn run() {
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-                
             let app_handle_for_password = app_handle.clone();
-            let query_password = every(5).minutes().at(0).in_timezone(&Utc)
-            .perform(move || {
+            let query_password = every(5).minutes().at(0).in_timezone(&Utc).perform(move || {
                 let handle = app_handle_for_password.clone();
                 async move {
                     match utils::query_password_for_server(&handle).await {
@@ -267,7 +265,10 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![utils::commands::set_server, utils::commands::server_url])
+        .invoke_handler(tauri::generate_handler![
+            utils::commands::set_server,
+            utils::commands::server_url
+        ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(move |app_handle, event| {

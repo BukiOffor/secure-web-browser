@@ -77,3 +77,8 @@ pub fn get_server_url(app: &tauri::AppHandle) -> Result<String, ModuleError> {
     };
     Err(ModuleError::Internal("Couldn't get server url".into()))
 }
+
+#[tauri::command]
+pub fn exit_exam(_app: tauri::AppHandle) -> Result<(), ModuleError> {
+   Ok(())
+}

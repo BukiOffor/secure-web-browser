@@ -197,101 +197,6 @@ pub fn is_disallowed_device_connected() -> Vec<USBDevice> {
         .collect()
 }
 
-#[allow(dead_code)]
-fn get_udp_endpoints() -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
-    let output = Command::new("powershell")
-        .args([
-            "-Command",
-            "Get-NetUDPEndpoint | Select-Object -Property LocalAddress, LocalPort, CreationTime, Status, @{Name='ProcessName'; Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | ConvertTo-Json",
-        ])
-        .output()?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "PowerShell failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )
-        .into());
-    }
-
-    let json = String::from_utf8(output.stdout)?;
-    parse_udp_json(&json)
-}
-
-#[allow(dead_code)]
-fn parse_udp_json(json: &str) -> Result<Vec<UdpEndpoint>, Box<dyn std::error::Error>> {
-    let raw: serde_json::Value = serde_json::from_str(json)?;
-
-    let entries: Vec<RawUdpEndpoint> = if raw.is_array() {
-        serde_json::from_value(raw)?
-    } else {
-        // Sometimes PowerShell returns an object if only one result exists
-        vec![serde_json::from_value(raw)?]
-    };
-
-    let result = entries
-        .into_iter()
-        .map(|entry| UdpEndpoint {
-            local_address: entry.local_address,
-            local_port: entry.local_port,
-            process_name: entry.process_name,
-            creation_time: entry.creation_time,
-            status: entry.status,
-        })
-        .collect();
-
-    Ok(result)
-}
-
-fn is_udp_running() -> Vec<PortStatus> {
-    let mut status = vec![];
-    for port in 6_300..=6_535_u32 {
-        match UdpSocket::bind(format!("127.0.0.1:{}", port)) {
-            Ok(_) => continue, // If bind succeeds, port is free
-            // If bind fails, port is likely in use
-            Err(_) => {
-                log::info!(
-                    "Port {} refused connection, assuming Udp is running...",
-                    port
-                );
-                status.push(PortStatus::new(port, true))
-            }
-        }
-    }
-    status
-}
-
-fn is_known_webrtc_program_running() -> Vec<ProcessIdentifier> {
-    let known_apps = vec!["zoom", "teams", "skype", "discord", "team viewer"];
-    let mut sys = System::new_all();
-    sys.refresh_all();
-    sys.processes()
-        .iter()
-        .filter_map(|(_, process)| {
-            let name = process.name().to_string_lossy();
-            if known_apps.iter().any(|app| name.contains(app)) {
-                Some(ProcessIdentifier {
-                    process_id: process.pid().as_u32() as i32,
-                    status: true, // running
-                    parent: process.parent().map(|p| p.as_u32() as i32),
-                    start_time: process.start_time(),
-                    run_time: process.run_time(),
-                    cpu_usage: process.cpu_usage(),
-                })
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-pub fn is_web_rtc_running() -> WebRtcReport {
-    WebRtcReport {
-        ports: is_udp_running(),
-        processes: is_known_webrtc_program_running(),
-    }
-}
-
 #[cfg(target_os = "windows")]
 pub fn disable_cad_actions(enable: bool) -> std::io::Result<()> {
     use winreg::enums::*;
@@ -394,7 +299,7 @@ pub fn navigate_and_adjust_window(app: &tauri::AppHandle, url: Url) -> Result<()
     Ok(())
 }
 
-pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleError>{
+pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleError> {
     log::info!("🚨 Request for Pasword Logged!");
     let url = get_server_url(&app)?;
     let response = reqwest::get(format!("{}:8080/password", url)).await?;
@@ -406,23 +311,23 @@ pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleErro
 
     if status.is_success() {
         let response: types::PasswordResponse =
-            serde_json::from_str(&body).map_err(|e| format!("Failed to parse JSON: {}", e))?;      
-        let password = response.message;  
+            serde_json::from_str(&body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        let password = response.message;
         let store = app
             .store("store.json")
             .map_err(|e| ModuleError::Internal(format!("Failed to get store: {}", e)))?;
         if let Some(value) = store.get("password") {
-        let old_password = value
-            .as_object()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_str()
-            .unwrap();
-        if old_password.eq(&password) {
+            let old_password = value
+                .as_object()
+                .unwrap()
+                .get("value")
+                .unwrap()
+                .as_str()
+                .unwrap();
+            if old_password.eq(&password) {
                 log::info!("Password has not changed, sleeping ...");
-                return Ok(())
-            }    
+                return Ok(());
+            }
         }
         log::info!("Password has changed, Writing new password ...");
         store.set("password", json!({"value": password}));
