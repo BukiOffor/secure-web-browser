@@ -353,11 +353,13 @@ pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleErro
 pub fn get_current_display() -> Result<Vec<String>, ModuleError> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         // Define the PowerShell command
         let ps_script = r#"Get-WmiObject -Namespace root\wmi -Query "Select * from WmiMonitorConnectionParams""#;
         // Run PowerShell
         let output = Command::new("powershell")
             .args(["-Command", ps_script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW)
             .output()
             .map_err(|e| ModuleError::Internal(format!("Failed to execute PowerShell: {}", e)))?;
         if output.status.success() {

@@ -19,7 +19,7 @@ pub struct PasswordResponse {
 
 #[get("/validate")]
 async fn root() -> impl Responder {
-   println!("Validating server information");
+   log::info!("Validating server information");
    HttpResponse::Ok().json(
     Response {
         status: true,
@@ -31,7 +31,7 @@ async fn root() -> impl Responder {
 
 #[get("/password")]
 async fn get_password() -> impl Responder {
-   println!("Validating server information");
+   log::info!("Received a request for password !!");
    HttpResponse::Ok().json(
    PasswordResponse{
     message: "password".into(),
@@ -41,13 +41,14 @@ async fn get_password() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Starting HTTP server at port 8080");
+    env_logger::init();
+    log::info!("Starting HTTP server at port 8080");
     HttpServer::new(|| {
         App::new()
             .service(root)
             .service(get_password)
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }

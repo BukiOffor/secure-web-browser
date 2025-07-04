@@ -43,7 +43,7 @@ pub fn run() {
         .setup(|app| {
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
-                    .level(log::LevelFilter::Trace)
+                    .level(log::LevelFilter::Info)
                     .build(),
             )?;
             // request notification access from user
@@ -118,7 +118,7 @@ pub fn run() {
                                                 process::exit(1); // Exit on error
                                             }
                                             CommandEvent::Terminated(_) => {
-                                                log::error!("❌ ❌ ❌ [Sidecar] Terminated.");
+                                                log::info!("[Sidecar] Terminated.");
                                                 //process::exit(1); // Exit on error
                                             }
                                             _ => {}
@@ -156,12 +156,22 @@ pub fn run() {
                     })
                     .build(),
             )?;
-            app.global_shortcut().register(kill_binding).unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
+            app.global_shortcut()
+                .register(kill_binding)
+                .unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
 
             #[cfg(not(target_os = "windows"))]
             {
-                app.global_shortcut().register(cltr_alt_delete_shortcut).unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
-                app.global_shortcut().register(minimized_shortcut).unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
+                app.global_shortcut()
+                    .register(cltr_alt_delete_shortcut)
+                    .unwrap_or_else(|err| {
+                        log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err)
+                    });
+                app.global_shortcut()
+                    .register(minimized_shortcut)
+                    .unwrap_or_else(|err| {
+                        log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err)
+                    });
             }
 
             if let Some(window) = app.get_webview_window("main") {
@@ -251,7 +261,9 @@ pub fn run() {
                             .send(Triggers::DisAllowedInputDectected(response))
                         {
                             Ok(_) => log::info!("send was successful"),
-                            Err(e) => log::error!("❌ ❌ ❌ Input Task: Send Failed on Channel: {:?}", e),
+                            Err(e) => {
+                                log::error!("❌ ❌ ❌ Input Task: Send Failed on Channel: {:?}", e)
+                            }
                         }
                     }
                     log::info!("Task executed: No Usb Devices Found!");
@@ -284,9 +296,14 @@ pub fn run() {
                     while let Ok(event) = rx.recv() {
                         match event {
                             Triggers::DisAllowedInputDectected(device) => {
+                                let device = device
+                                    .last()
+                                    .and_then(|d| d.description.clone())
+                                    .and_then(|d| Some(d.to_string()))
+                                    .unwrap_or("UnNamed Device".into());
                                 log::info!(
                                     "Disallowed Input Detected with Description: `{}`, Exiting App",
-                                    device[0].description.clone().unwrap_or("unnamed".into())
+                                    device
                                 );
                                 app_handle
                                     .notification()
@@ -304,9 +321,13 @@ pub fn run() {
                                 app_handle.exit(0);
                             }
                             Triggers::AdditionalDisplayDectected(displays) => {
+                                let display = displays
+                                    .into_iter()
+                                    .last()
+                                    .unwrap_or("UnNamed Display".into());
                                 log::info!(
                                     "Disallowed Display Detected {} :, Exiting App",
-                                    displays[1]
+                                    display
                                 );
                                 app_handle
                                     .notification()
@@ -320,7 +341,7 @@ pub fn run() {
                                             error
                                         )
                                     });
-                                tokio::time::sleep(Duration::from_secs(500)).await;
+                                tokio::time::sleep(Duration::from_secs(200)).await;
 
                                 app_handle.exit(0);
                             }
@@ -371,6 +392,9 @@ pub fn run() {
                             log::error!("❌ ❌ ❌ Error Obtaining Lock: {}", e);
                         }
                     }
+                    utils::disable_cad_actions(false).unwrap_or_else(|e| {
+                        log::error!("❌ ❌ ❌ Error Enabling CAD Actions: {}", e);
+                    });
                 }
                 let child_process = app_handle.state::<AppState>().child_process.clone();
                 let lock_result = child_process.lock();
