@@ -49,7 +49,7 @@ pub fn run() {
             // request notification access from user
             match app.notification().request_permission() {
                 Ok(_) => log::info!("Permission Requested for Application"),
-                Err(err) => log::error!("Couldn't request permision: {}", err),
+                Err(err) => log::error!("❌ ❌ ❌ Couldn't request permision: {}", err),
             }
 
             // Check if running in a guest machine on windows
@@ -63,7 +63,7 @@ pub fn run() {
                 log::info!("Disabling CAD commands");
                 utils::disable_cad_actions(true).unwrap_or_else(|_| {
                     log::error!("❌ ❌ ❌ Could not disable cad command");
-            })
+                })
             }
             // get host info
             let host_info = utils::get_host_info();
@@ -73,64 +73,69 @@ pub fn run() {
                 log::info!("Dectected Windows Environment: Running side car");
                 app.handle()
                     .plugin(tauri_plugin_shell::init())
-                    .unwrap_or_else(
-                        |_| log::error!("❌ ❌ ❌ Failed to initialize shell plugin for Windows")
-                    );
+                    .unwrap_or_else(|_| {
+                        log::error!("❌ ❌ ❌ Failed to initialize shell plugin for Windows")
+                    });
 
-                let sidecar = match app
-                                    .shell()
-                                    .sidecar("mapper") {
-                                        Ok(sidecar) => sidecar,
-                                        Err(err) => {
-                                            log::info!("❌ ❌ ❌ Failed to get sidecar: {}", err);
-                                            return Ok(()); // Or handle the error as appropriate
+                match app.shell().sidecar("mapper") {
+                    Ok(sidecar) => {
+                        let process = sidecar.spawn();
+
+                        match process {
+                            Ok((mut rx, child)) => {
+                                // Save the child handle
+                                let app_state = app.state::<AppState>();
+                                match app_state.child_process.lock() {
+                                    Ok(mut lock) => {
+                                        *lock = Some(child);
+                                        drop(lock);
+                                    }
+                                    Err(err) => {
+                                        log::error!("❌ ❌ ❌ Error Obtaining Lock: {}", err);
+                                    }
+                                };
+
+                                tauri::async_runtime::spawn(async move {
+                                    while let Some(event) = rx.recv().await {
+                                        match event {
+                                            CommandEvent::Stdout(line) => {
+                                                log::info!(
+                                                    "[Sidecar stdout] {:?}",
+                                                    String::from_utf8_lossy(&line)
+                                                );
+                                            }
+                                            CommandEvent::Stderr(line) => {
+                                                log::error!(
+                                                    "❌ ❌ ❌ [Sidecar stderr] {:?}",
+                                                    String::from_utf8_lossy(&line)
+                                                );
+                                            }
+                                            CommandEvent::Error(err) => {
+                                                let error_message =
+                                                    format!("[Sidecar error] {}", err);
+                                                log::error!("❌ ❌ ❌ {}", &error_message);
+
+                                                process::exit(1); // Exit on error
+                                            }
+                                            CommandEvent::Terminated(_) => {
+                                                log::error!("❌ ❌ ❌ [Sidecar] Terminated.");
+                                                //process::exit(1); // Exit on error
+                                            }
+                                            _ => {}
                                         }
-                                    };
-                    
-                let process = sidecar.spawn();
-
-                match process {
-                    Ok((mut rx, child)) => {
-                        // Save the child handle
-                        let app_state = app.state::<AppState>();
-                        let mut child_lock = app_state.child_process.lock().unwrap();
-                        *child_lock = Some(child);
-                        drop(child_lock);
-                        tauri::async_runtime::spawn(async move {
-                            while let Some(event) = rx.recv().await {
-                                match event {
-                                    CommandEvent::Stdout(line) => {
-                                        log::info!(
-                                            "[Sidecar stdout] {:?}",
-                                            String::from_utf8_lossy(&line)
-                                        );
                                     }
-                                    CommandEvent::Stderr(line) => {
-                                        log::error!(
-                                            "[Sidecar stderr] {:?}",
-                                            String::from_utf8_lossy(&line)
-                                        );
-                                    }
-                                    CommandEvent::Error(err) => {
-                                        let error_message = format!("[Sidecar error] {}", err);
-                                        log::error!("{}", &error_message);
-
-                                        process::exit(1); // Exit on error
-                                    }
-                                    CommandEvent::Terminated(_) => {
-                                        log::error!("[Sidecar] Terminated.");
-                                        //process::exit(1); // Exit on error
-                                    }
-                                    _ => {}
-                                }
+                                });
                             }
-                        });
+                            Err(err) => {
+                                log::error!("❌ ❌ ❌ Failed to spawn sidecar process: {}", err);
+                                app.handle().exit(1);
+                            }
+                        }
                     }
                     Err(err) => {
-                        log::error!("Failed to spawn sidecar process: {}", err);
-                        app.handle().exit(1);
+                        log::info!("❌ ❌ ❌ Failed to get sidecar: {}", err);
                     }
-                }
+                };
             }
 
             let kill_binding = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyK);
@@ -151,16 +156,21 @@ pub fn run() {
                     })
                     .build(),
             )?;
-            app.global_shortcut().register(kill_binding)?;
+            app.global_shortcut().register(kill_binding).unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
 
             #[cfg(not(target_os = "windows"))]
             {
-                app.global_shortcut().register(cltr_alt_delete_shortcut)?;
-                app.global_shortcut().register(minimized_shortcut)?;
+                app.global_shortcut().register(cltr_alt_delete_shortcut).unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
+                app.global_shortcut().register(minimized_shortcut).unwrap_or_else(|err| log::error!("❌ ❌ ❌ Failed to register shortcut: {}", err));
             }
 
-            let window = app.get_webview_window("main").unwrap();
-            window.set_fullscreen(true)?;
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_fullscreen(true).unwrap_or_else(|e| {
+                    log::error!("❌ ❌ ❌ Failed to set fullscreen: {}", e);
+                });
+            } else {
+                log::error!("❌ ❌ ❌ Main webview window not found.");
+            }
             // create a channel for listeners
             let (sender, rx) = channel::<Triggers>();
             let app_handle = app.handle().clone();
@@ -176,12 +186,12 @@ pub fn run() {
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
             let app_handle_for_password = app_handle.clone();
-            let query_password = every(5).minutes().at(0).in_timezone(&Utc).perform(move || {
+            let query_password = every(1).minutes().at(0).in_timezone(&Utc).perform(move || {
                 let handle = app_handle_for_password.clone();
                 async move {
                     match utils::query_password_for_server(&handle).await {
                         Ok(_) => log::info!("Task: Querying Password was Successful"),
-                        Err(e) => log::error!("Querying Password Error: {}", e),
+                        Err(e) => log::error!("❌ ❌ ❌ Querying Password Error: {}", e),
                     }
                 }
             });
@@ -208,14 +218,14 @@ pub fn run() {
                                         log::info!("Display Trigger has been sent succesfully")
                                     }
                                     Err(e) => {
-                                        log::error!("Display Send Failed: {:?}", e)
+                                        log::error!("❌ ❌ ❌ Display Send Failed: {:?}", e)
                                     }
                                 }
-                            }else {
-                            log::info!("Task: Did not find any additional display")
+                            } else {
+                                log::info!("Task: Did not find any additional display")
                             }
                         }
-                        Err(e) => log::error!("Checking Display Error: {}", e),
+                        Err(e) => log::error!("❌ ❌ ❌ Checking Display Error: {}", e),
                     }
                 }
             });
@@ -241,7 +251,7 @@ pub fn run() {
                             .send(Triggers::DisAllowedInputDectected(response))
                         {
                             Ok(_) => log::info!("send was successful"),
-                            Err(e) => log::error!("send failed: {:?}", e),
+                            Err(e) => log::error!("❌ ❌ ❌ Input Task: Send Failed on Channel: {:?}", e),
                         }
                     }
                     log::info!("Task executed: No Usb Devices Found!");
@@ -255,7 +265,7 @@ pub fn run() {
                 async move {
                     match scheduler.add_task(task).await {
                         Ok(_) => log::info!("Task: Usb Device Checker added successfully."),
-                        Err(e) => log::error!("Error adding task: {:?}", e),
+                        Err(e) => log::error!("❌ ❌ ❌ Error adding task: {:?}", e),
                     }
                     scheduler.start().await;
                 }
@@ -284,30 +294,41 @@ pub fn run() {
                                     .title("Device Compromised")
                                     .body("An external device has been attached to your device")
                                     .show()
-                                    .unwrap();
+                                    .unwrap_or_else(|error| {
+                                        log::error!(
+                                            "❌ ❌ ❌ Error Sending Notification: {}",
+                                            error
+                                        )
+                                    });
                                 tokio::time::sleep(Duration::from_secs(30)).await;
                                 app_handle.exit(0);
-                            },
+                            }
                             Triggers::AdditionalDisplayDectected(displays) => {
-                                 log::info!(
-                                    "Disallowed Display Detected {} :, Exiting App",displays[1]);
+                                log::info!(
+                                    "Disallowed Display Detected {} :, Exiting App",
+                                    displays[1]
+                                );
                                 app_handle
                                     .notification()
                                     .builder()
                                     .title("Device Compromised")
                                     .body("An external device has been attached to your device")
                                     .show()
-                                    .unwrap();
-                                tokio::time::sleep(Duration::from_secs(30)).await;
+                                    .unwrap_or_else(|error| {
+                                        log::error!(
+                                            "❌ ❌ ❌ Error Sending Notification: {}",
+                                            error
+                                        )
+                                    });
+                                tokio::time::sleep(Duration::from_secs(500)).await;
 
                                 app_handle.exit(0);
-                            },
+                            }
                             _ => {}
                         }
                     }
                 }
             });
-            //app.notification().builder().title("title").body("body").show().unwrap();
             Ok(())
         })
         .on_window_event({
@@ -338,17 +359,31 @@ pub fn run() {
                 #[cfg(target_os = "windows")]
                 {
                     let child_process = app_handle.state::<AppState>().child_process.clone();
-                    let mut lock = child_process.lock().unwrap();
-                    if let Some(child) = lock.take() {
-                        let _ = child.kill();
-                        log::info!("🛑 Sidecar killed on exit.");
+                    let lock_result = child_process.lock();
+                    match lock_result {
+                        Ok(mut lock) => {
+                            if let Some(child) = lock.take() {
+                                let _ = child.kill();
+                                log::info!("🛑 Sidecar killed on exit.");
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("❌ ❌ ❌ Error Obtaining Lock: {}", e);
+                        }
                     }
                 }
                 let child_process = app_handle.state::<AppState>().child_process.clone();
-                let mut lock = child_process.lock().unwrap();
-                if let Some(child) = lock.take() {
-                    let _ = child.kill();
-                    println!("🛑 Sidecar killed on restart.");
+                let lock_result = child_process.lock();
+                match lock_result {
+                    Ok(mut lock) => {
+                        if let Some(child) = lock.take() {
+                            let _ = child.kill();
+                            log::info!("🛑 Sidecar killed on exit.");
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("❌ ❌ ❌ Error Obtaining Lock: {}", e);
+                    }
                 }
             }
         });

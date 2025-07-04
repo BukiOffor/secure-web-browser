@@ -54,6 +54,7 @@ export default function ExitModal() {
                     placeholder="***************"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    required
                 />
                 <button
                     onClick={handleSubmit}

@@ -40,7 +40,7 @@ pub fn build_bindings(
             ShortcutState::Released => {
                 log::info!("Ctrl-K Released!");
                 app.emit("start::exit", ())
-                    .unwrap_or_else(|e| log::error!("Failed to emit: {} ", e));
+                    .unwrap_or_else(|e| log::error!("❌ ❌ ❌ Failed to emit: {} ", e));
                 let state = app.state::<InitState>();
                 let state = state.0.read();
                 if let Ok(result) = state {
@@ -58,7 +58,7 @@ pub fn build_bindings(
             ShortcutState::Released => {
                 log::info!("Ctrl+Alt+Delete Released!");
                 app.emit("cad::prompt", ())
-                    .unwrap_or_else(|e| log::error!("Failed to emit: {} ", e));
+                    .unwrap_or_else(|e| log::error!("❌ ❌ ❌ Failed to emit: {} ", e));
             }
         }
     } else if shortcut == minimized_shortcut {
@@ -322,19 +322,24 @@ pub async fn query_password_for_server(app: &AppHandle) -> Result<(), ModuleErro
         let store = app
             .store("store.json")
             .map_err(|e| ModuleError::Internal(format!("Failed to get store: {}", e)))?;
-        if let Some(value) = store.get("password") {
-            let old_password = value
-                .as_object()
-                .unwrap()
-                .get("value")
-                .unwrap()
-                .as_str()
-                .unwrap();
+
+        let password_result = store
+            .get("password")
+            .and_then(|v| v.as_object().cloned())
+            .and_then(|o| o.get("value").cloned())
+            .and_then(|v| Some(v))
+            .ok_or_else(|| {
+                log::error!("❌ ❌ ❌ Couldn't find url in store");
+                ModuleError::Internal("Couldn't find url in store".into())
+            });
+        if let Ok(value) = password_result {
+            let old_password = value.as_str().unwrap_or_default();
             if old_password.eq(&password) {
                 log::info!("Password has not changed, sleeping ...");
                 return Ok(());
             }
         }
+
         log::info!("Password has changed, Writing new password ...");
         store.set("password", json!({"value": password}));
         store
@@ -367,7 +372,7 @@ pub fn get_current_display() -> Result<Vec<String>, ModuleError> {
             Ok(display_blocks.into_iter().map(|s| s.to_string()).collect())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            log::error!("PowerShell error:\n{}", stderr);
+            log::error!("❌ ❌ ❌ PowerShell error:\n{}", stderr);
             Ok(vec![])
         }
     }

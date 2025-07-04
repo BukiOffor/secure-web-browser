@@ -74,18 +74,20 @@ pub fn get_server_url(app: &tauri::AppHandle) -> Result<String, ModuleError> {
         .store("store.json")
         .map_err(|e| ModuleError::Internal(e.to_string()))?;
 
-    if let Some(value) = store.get("url") {
-        let server_url = value
-            .as_object()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_str()
-            .unwrap();
+    let url_result = store
+        .get("url")
+        .and_then(|v| v.as_object().cloned())
+        .and_then(|o| o.get("value").cloned())
+        .and_then(|v| Some(v))
+        .ok_or_else(|| {
+            log::error!("❌ ❌ ❌ Couldn't find url in store");
+            ModuleError::Internal("Couldn't find url in store".into())
+        })?;
+    let server_url = url_result
+        .as_str()
+        .ok_or(ModuleError::Internal("Couldn't get server url".into()))?;
 
-        return Ok(server_url.to_string());
-    };
-    Err(ModuleError::Internal("Couldn't get server url".into()))
+    return Ok(server_url.to_string());
 }
 
 #[tauri::command]
@@ -95,20 +97,35 @@ pub async fn exit_exam(app: tauri::AppHandle, password: String) -> Result<bool, 
         .map_err(|e| ModuleError::Internal(e.to_string()))?;
 
     if let Some(value) = store.get("password") {
-        let state_password = value
-            .as_object()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_str()
-            .unwrap();
+        let state_password = match value.as_object() {
+            Some(obj) => match obj.get("value") {
+                Some(val) => match val.as_str() {
+                    Some(s) => s,
+                    None => {
+                        log::error!("❌ ❌ ❌ Failed to convert 'value' to str");
+                        return Err(ModuleError::Internal("Couldn't get server password".into()));
+                    }
+                },
+                None => {
+                    log::error!("❌ ❌ ❌ 'value' key not found in password object");
+                    return Err(ModuleError::Internal("Couldn't get server password".into()));
+                }
+            },
+            None => {
+                log::error!("❌ ❌ ❌ Failed to convert password to object");
+                return Err(ModuleError::Internal("Couldn't get server password".into()));
+            }
+        };
         if state_password.eq(&password) {
             app.notification()
                 .builder()
                 .title("Exiting")
                 .body("A user has requested exit and app will shut down in 5 seconds")
                 .show()
-                .unwrap();
+                .unwrap_or_else(|error| {
+                    log::error!("❌ ❌ ❌ Error Sending Notification: {}", error)
+                });
+
             return Ok(true);
         } else {
             Ok(false)
