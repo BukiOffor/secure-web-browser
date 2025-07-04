@@ -40,7 +40,7 @@ pub fn build_bindings(
             ShortcutState::Released => {
                 log::info!("Ctrl-K Released!");
                 app.emit("start::exit", ())
-                    .expect("Failed to emit show-password-prompt");
+                    .unwrap_or_else(|e| log::error!("Failed to emit: {} ", e));
                 let state = app.state::<InitState>();
                 let state = state.0.read();
                 if let Ok(result) = state {
@@ -57,8 +57,8 @@ pub fn build_bindings(
             }
             ShortcutState::Released => {
                 log::info!("Ctrl+Alt+Delete Released!");
-                app.emit("show-ctrl-alt-delete-prompt", ())
-                    .expect("Failed to emit show-ctrl-alt-delete-prompt");
+                app.emit("cad::prompt", ())
+                    .unwrap_or_else(|e| log::error!("Failed to emit: {} ", e));
             }
         }
     } else if shortcut == minimized_shortcut {

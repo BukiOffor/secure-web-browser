@@ -56,7 +56,7 @@ pub async fn set_server(app: tauri::AppHandle, url: String) -> Result<(), Module
     } else if status.is_client_error() {
         Err(ModuleError::Internal("Request was incorrect".into()))
     } else {
-        Err(ModuleError::Internal("Unexpected error".into()))
+        Err(ModuleError::Internal("Something Went Wrong".into()))
     }
 }
 

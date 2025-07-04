@@ -43,7 +43,7 @@ pub fn run() {
         .setup(|app| {
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
-                    .level(log::LevelFilter::Info)
+                    .level(log::LevelFilter::Trace)
                     .build(),
             )?;
             // request notification access from user
@@ -51,7 +51,6 @@ pub fn run() {
                 Ok(_) => log::info!("Permission Requested for Application"),
                 Err(err) => log::error!("Couldn't request permision: {}", err),
             }
-            //app.notification().builder().show().unwrap();
 
             // Check if running in a guest machine on windows
             if utils::is_virtual_machine() || utils::is_running_in_rdp() {
@@ -62,7 +61,9 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 log::info!("Disabling CAD commands");
-                utils::disable_cad_actions(true).expect("could not disable cad command");
+                utils::disable_cad_actions(true).unwrap_or_else(|_| {
+                    log::error!("❌ ❌ ❌ Could not disable cad command");
+            })
             }
             // get host info
             let host_info = utils::get_host_info();
@@ -72,12 +73,20 @@ pub fn run() {
                 log::info!("Dectected Windows Environment: Running side car");
                 app.handle()
                     .plugin(tauri_plugin_shell::init())
-                    .expect("Failed to initialize shell plugin for Windows");
+                    .unwrap_or_else(
+                        |_| log::error!("❌ ❌ ❌ Failed to initialize shell plugin for Windows")
+                    );
 
-                let sidecar = app
-                    .shell()
-                    .sidecar("mapper")
-                    .expect("Failed to get sidecar");
+                let sidecar = match app
+                                    .shell()
+                                    .sidecar("mapper") {
+                                        Ok(sidecar) => sidecar,
+                                        Err(err) => {
+                                            log::info!("❌ ❌ ❌ Failed to get sidecar: {}", err);
+                                            return Ok(()); // Or handle the error as appropriate
+                                        }
+                                    };
+                    
                 let process = sidecar.spawn();
 
                 match process {
@@ -276,7 +285,7 @@ pub fn run() {
                                     .body("An external device has been attached to your device")
                                     .show()
                                     .unwrap();
-                                tokio::time::sleep(Duration::from_secs(9)).await;
+                                tokio::time::sleep(Duration::from_secs(30)).await;
                                 app_handle.exit(0);
                             },
                             Triggers::AdditionalDisplayDectected(displays) => {
@@ -289,7 +298,8 @@ pub fn run() {
                                     .body("An external device has been attached to your device")
                                     .show()
                                     .unwrap();
-                                tokio::time::sleep(Duration::from_secs(9)).await;
+                                tokio::time::sleep(Duration::from_secs(30)).await;
+
                                 app_handle.exit(0);
                             },
                             _ => {}

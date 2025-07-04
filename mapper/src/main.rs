@@ -1,4 +1,5 @@
 fn main() {
     mapper::key_mapper::capture_key()
-        .expect("Failed to capture key");
+        .unwrap_or_else(|e| eprintln!("Error: {}", e));
 }
+
